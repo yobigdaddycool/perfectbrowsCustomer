@@ -1,4 +1,25 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs').promises;
+const path = require('path');
+
+// Error logging function
+async function logError(errorMessage, errorDetails = '') {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ERROR: ${errorMessage}${errorDetails ? ` - Details: ${errorDetails}` : ''}\n`;
+  
+  const logDir = path.join(__dirname, 'logs');
+  const logFile = path.join(logDir, 'database-errors.log');
+  
+  try {
+    // Create logs directory if it doesn't exist
+    await fs.mkdir(logDir, { recursive: true });
+    // Append error to log file
+    await fs.appendFile(logFile, logEntry);
+    console.log('Error logged to:', logFile);
+  } catch (logError) {
+    console.error('Failed to write to error log:', logError.message);
+  }
+}
 
 async function testConnection() {
   const connectionConfig = {
@@ -27,8 +48,12 @@ async function testConnection() {
     console.log('✅ Query test successful:', rows);
     
   } catch (error) {
-    console.error('❌ ERROR: Failed to connect to MySQL database');
+    const errorMessage = 'Failed to connect to MySQL database';
+    console.error('❌ ERROR:', errorMessage);
     console.error('Error details:', error.message);
+    
+    // Log error to file
+    await logError(errorMessage, error.message);
     process.exit(1);
   } finally {
     if (connection) {
