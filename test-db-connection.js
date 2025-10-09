@@ -4,7 +4,7 @@ async function testConnection() {
   const connectionConfig = {
     host: '50.6.108.147',
     port: 3306,
-    database: 'ichrqhmy_test',
+    database: 'ichrqhmy_PerfectCustomer',
     user: 'ichrqhmy_testuser',
     password: 'Destruction123!',
     ssl: {
