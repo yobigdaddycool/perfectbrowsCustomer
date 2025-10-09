@@ -1,0 +1,215 @@
+﻿# deep-seek-register-fixed.ps1
+# This script updates the register.component.ts file with full validation
+
+$filePath = "src\app\pages\register\register.component.ts"
+
+$newContent = @'
+import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-register',
+  standalone: true,
+  imports: [FormsModule],
+  templateUrl: './register.component.html',
+  styleUrls: ['./register.component.css']
+})
+export class RegisterComponent {
+  customer = {
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    stylist: '',
+    visitType: 'New',
+    service: '',
+    notes: '',
+    date: '',
+    time: '',
+    price: '',
+    smsConsent: false,
+    emailConsent: false
+  };
+
+  showToast = false;
+  toastMessage = '';
+  fieldErrors: { [key: string]: string } = {};
+
+  onSubmit() {
+    this.fieldErrors = {};
+    const errors = this.validateForm();
+    
+    if (Object.keys(errors).length > 0) {
+      this.fieldErrors = errors;
+      this.showToastMessage('Please fix the errors in the form.');
+      return;
+    }
+
+    console.log('Customer Data:', this.customer);
+    this.showToastMessage('Customer saved successfully!');
+  }
+
+  onClear() {
+    this.customer = {
+      firstName: '',
+      lastName: '',
+      phone: '',
+      email: '',
+      stylist: '',
+      visitType: 'New',
+      service: '',
+      notes: '',
+      date: '',
+      time: '',
+      price: '',
+      smsConsent: false,
+      emailConsent: false
+    };
+    this.fieldErrors = {};
+  }
+
+  validateForm(): { [key: string]: string } {
+    const errors: { [key: string]: string } = {};
+
+    if (!this.customer.firstName?.trim()) {
+      errors['firstName'] = 'First name is required';
+    } else if (this.customer.firstName.length < 2) {
+      errors['firstName'] = 'First name must be at least 2 characters';
+    }
+
+    if (!this.customer.lastName?.trim()) {
+      errors['lastName'] = 'Last name is required';
+    } else if (this.customer.lastName.length < 2) {
+      errors['lastName'] = 'Last name must be at least 2 characters';
+    }
+
+    if (!this.customer.stylist) {
+      errors['stylist'] = 'Please select a stylist';
+    }
+
+    if (!this.customer.service) {
+      errors['service'] = 'Please select a service';
+    }
+
+    if (this.customer.email && !this.isValidEmail(this.customer.email)) {
+      errors['email'] = 'Please enter a valid email address';
+    }
+
+    if (this.customer.phone && !this.isValidPhone(this.customer.phone)) {
+      errors['phone'] = 'Please enter a valid phone number';
+    }
+
+    if (this.customer.date && !this.isValidDate(this.customer.date)) {
+      errors['date'] = 'Please enter a valid date';
+    }
+
+    if (this.customer.price && !this.isValidPrice(this.customer.price)) {
+      errors['price'] = 'Please enter a valid price (e.g., 29.99)';
+    }
+
+    if (this.customer.notes && this.customer.notes.length > 500) {
+      errors['notes'] = 'Notes cannot exceed 500 characters';
+    }
+
+    return errors;
+  }
+
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  private isValidPhone(phone: string): boolean {
+    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+  }
+
+  private isValidDate(date: string): boolean {
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate >= today;
+  }
+
+  private isValidPrice(price: any): boolean {
+    const numPrice = parseFloat(price);
+    return !isNaN(numPrice) && numPrice > 0;
+  }
+
+  validateField(fieldName: string, value: any) {
+    switch (fieldName) {
+      case 'firstName':
+        if (!value?.trim()) {
+          this.fieldErrors['firstName'] = 'First name is required';
+        } else if (value.length < 2) {
+          this.fieldErrors['firstName'] = 'First name must be at least 2 characters';
+        } else {
+          delete this.fieldErrors['firstName'];
+        }
+        break;
+
+      case 'lastName':
+        if (!value?.trim()) {
+          this.fieldErrors['lastName'] = 'Last name is required';
+        } else if (value.length < 2) {
+          this.fieldErrors['lastName'] = 'Last name must be at least 2 characters';
+        } else {
+          delete this.fieldErrors['lastName'];
+        }
+        break;
+
+      case 'email':
+        if (value && !this.isValidEmail(value)) {
+          this.fieldErrors['email'] = 'Please enter a valid email address';
+        } else {
+          delete this.fieldErrors['email'];
+        }
+        break;
+
+      case 'phone':
+        if (value && !this.isValidPhone(value)) {
+          this.fieldErrors['phone'] = 'Please enter a valid phone number';
+        } else {
+          delete this.fieldErrors['phone'];
+        }
+        break;
+
+      case 'price':
+        if (value && !this.isValidPrice(value)) {
+          this.fieldErrors['price'] = 'Please enter a valid price';
+        } else {
+          delete this.fieldErrors['price'];
+        }
+        break;
+    }
+  }
+
+  private showToastMessage(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
+  }
+
+  hasErrors(): boolean {
+    return Object.keys(this.fieldErrors).length > 0;
+  }
+}
+'@
+
+# Check if file exists
+if (Test-Path $filePath) {
+    # Backup the original file
+    $backupPath = "$filePath.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    Copy-Item $filePath $backupPath
+    Write-Host "Backup created: $backupPath" -ForegroundColor Yellow
+    
+    # Write new content
+    $newContent | Out-File -FilePath $filePath -Encoding utf8
+    Write-Host "✅ register.component.ts updated with FULL VALIDATION!" -ForegroundColor Green
+    Write-Host "📍 File: $((Get-Location).Path)\$filePath" -ForegroundColor Cyan
+} else {
+    Write-Host "❌ File not found: $filePath" -ForegroundColor Red
+    Write-Host "Make sure you're running this from the project root directory" -ForegroundColor Yellow
+}

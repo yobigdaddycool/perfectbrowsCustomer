@@ -1,10 +1,10 @@
-<div class="app-shell card">
+﻿<div class="app-shell card">
   <div class="header">
     <div class="logo" aria-hidden="true"></div>
     <h1 style="margin:0;font-size:18px">Salon Customer Manager</h1>
   </div>
   <nav class="nav">
-    <a routerLink="/" routerLinkActive="active">Register</a> <!-- Remove routerLinkActiveOptions -->
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">Register</a>
     <a routerLink="/search" routerLinkActive="active">Search</a>
     <a routerLink="/scan" routerLinkActive="active">QR Scanner</a>
   </nav>
