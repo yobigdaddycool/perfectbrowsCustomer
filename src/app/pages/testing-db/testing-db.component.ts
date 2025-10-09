@@ -62,7 +62,7 @@ export class TestingDbComponent {
     
     try {
       // Call the PHP backend for database testing
-      const response: any = await this.http.get('test-db-connection.php').toPromise();
+      const response: any = await this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection-api.php').toPromise();
       
       if (response.success) {
         this.testResult = `✅ ${response.message} - MySQL Version: ${response.queryResult?.mysql_version}`;
