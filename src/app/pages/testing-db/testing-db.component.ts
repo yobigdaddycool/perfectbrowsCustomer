@@ -67,7 +67,7 @@ console.log(response);
 
       
       if (response.success) {
-        this.testResult = `✅ ${response.message} - MySQL Version: ${response.queryResult?.mysql_version}`;
+        this.testResult = `✅ ${response.message} - MySQL Super Duper Version: ${response.queryResult?.mysql_version}`;
         if (response.testData && response.testData.length > 0) {
           this.testResult += ` - Found ${response.testData.length} test records`;
         }
