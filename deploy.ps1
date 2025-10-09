@@ -1,6 +1,3 @@
-Start-Service ssh-agent
-ssh-add $env:USERPROFILE\.ssh\id_rsa 2>$null
-
 # push MAIN
 git add -A
 git commit -m "update db button"
