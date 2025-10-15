@@ -84,7 +84,7 @@ export class TestingDbComponent {
       console.log('Full API Response:', response);
       
       if (response.success) {
-        this.testResult = `✅ ${response.message} - MySQL Version: ${response.queryResult?.mysql_version}`;
+        this.testResult = `✅ ${response.message} - MySQL Version: ${response.queryResult?.mysql_version} - Current Time: ${response.queryResult?.current_time_value}`;
         if (response.testData && response.testData.length > 0) {
           this.testResult += ` - Found ${response.testData.length} test records`;
         }
