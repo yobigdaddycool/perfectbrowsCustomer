@@ -7,13 +7,26 @@ ini_set('display_startup_errors', 1);
 // Set CORS headers to allow requests from Angular
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json');
+header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
 
 // Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
     exit();
+}
+
+// Add security check - only allow from your domain
+$allowed_origins = [
+    'http://website-2eb58030.ich.rqh.mybluehost.me',
+    'https://website-2eb58030.ich.rqh.mybluehost.me',
+    'http://localhost:4200' // For local Angular development
+];
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowed_origins)) {
+    header("Access-Control-Allow-Origin: $origin");
 }
 
 // Database configuration
@@ -94,6 +107,11 @@ try {
     } catch (PDOException $e2) {
         $response['debug'][] = "❌ Alternative connection also failed: " . $e2->getMessage();
     }
+} catch (Exception $e) {
+    $response['success'] = false;
+    $response['message'] = "General error occurred";
+    $response['error'] = $e->getMessage();
+    $response['debug'][] = "❌ General Exception: " . $e->getMessage();
 }
 
 // Return JSON response
