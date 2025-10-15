@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-testing-db',
@@ -61,8 +62,8 @@ export class TestingDbComponent {
     this.apiError = '';
     
     try {
-      // Call the PHP backend for database testin
-      const response: any = await this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection.php').toPromise();
+      // Call the PHP backend for database testing
+      const response: any = await lastValueFrom(this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection.php'));
 console.log(response);
 
       
