@@ -73,13 +73,10 @@ export class TestingDbComponent {
     
     try {
       // Call the PHP backend for database testing
+      const url = 'https://website-2eb58030.ich.rqh.mybluehost.me/website_2eb58030/test-db-connection.php';
       const response: any = await lastValueFrom(
-        this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection.php', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-      );
+  this.http.get(`${url}?t=${Date.now()}`, { responseType: 'json' })
+);
       
       console.log('Full API Response:', response);
       
