@@ -1,4 +1,9 @@
 <?php
+
+//forcing no caching for testing purposes
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
 // Force error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -78,7 +83,7 @@ try {
 
     if ($table_exists) {
         // Try to get some data from test_data table
-        $select_sql = "SELECT * FROM test_data ORDER BY created_at DESC LIMIT 5";
+        $select_sql = "SELECT * FROM test_data ORDER BY created_at DESC LIMIT 3";
         $stmt = $connection->query($select_sql);
         $test_data = $stmt->fetchAll();
         $response['debug'][] = "Found " . count($test_data) . " records in test_data table";
