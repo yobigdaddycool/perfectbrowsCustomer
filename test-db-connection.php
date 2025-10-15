@@ -62,7 +62,7 @@ try {
     $response['debug'][] = "PDO connected";
 
     // Base sanity query
-    $test_query = "SELECT 1 as test_result, NOW() as current_time, VERSION() as mysql_version";
+    $test_query = "SELECT 1 as test_result, NOW() as now_time, VERSION() as mysql_version";
     $stmt = $connection->query($test_query);
     $result = $stmt->fetch();
 
