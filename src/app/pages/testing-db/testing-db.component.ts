@@ -74,7 +74,7 @@ export class TestingDbComponent {
     try {
       // Call the PHP backend for database testing
       const response: any = await lastValueFrom(
-        this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection.php', {
+        this.http.get('https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connectionV2.php', {
           headers: {
             'Content-Type': 'application/json'
           }
