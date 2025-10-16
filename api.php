@@ -122,7 +122,7 @@ function getTestData(&$response) {
 
         if ($table_exists) {
             // Get test data
-            $select_sql = "SELECT * FROM test_data ORDER BY created_at DESC LIMIT 3";
+            $select_sql = "SELECT * FROM test_data ORDER BY created_at DESC";
             $stmt = $pdo->query($select_sql);
             $test_data = $stmt->fetchAll();
             

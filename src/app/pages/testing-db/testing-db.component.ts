@@ -73,12 +73,22 @@ import { lastValueFrom } from 'rxjs';
 
         <div *ngIf="testData.length > 0" style="margin-top: 20px; padding: 15px; border-radius: 6px; background-color: #e2e3e5; border: 1px solid #d6d8db;">
           <h3 style="margin-top: 0; color: #383d41;">Test Data ({{ testData.length }} records):</h3>
-          <div *ngFor="let item of testData" style="text-align: left; margin: 10px 0; padding: 10px; background: white; border-radius: 4px;">
-            <p style="margin: 2px 0;"><strong>ID:</strong> {{ item.id }}</p>
-            <p style="margin: 2px 0;"><strong>Name:</strong> {{ item.name }}</p>
-            <p style="margin: 2px 0;"><strong>Email:</strong> {{ item.email }}</p>
-            <p style="margin: 2px 0;"><strong>Created:</strong> {{ item.created_at }}</p>
-          </div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+              <tr style="background-color: #f8f9fa;">
+                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">ID</th>
+                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Name</th>
+                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of testData" style="border-bottom: 1px solid #dee2e6;">
+                <td style="padding: 8px;">{{ item.id }}</td>
+                <td style="padding: 8px;">{{ item.name }}</td>
+                <td style="padding: 8px;">{{ item.email }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
