@@ -1,0 +1,8 @@
+[08-Oct-2025 11:30:23 America/Boise] PHP Fatal error:  Uncaught Error: Undefined constant PDO::MYSQL_ATTR_SSL_MODE in /home2/ichrqhmy/public_html/website_2eb58030/testmysql/index.php:48
+Stack trace:
+#0 {main}
+  thrown in /home2/ichrqhmy/public_html/website_2eb58030/testmysql/index.php on line 48
+[08-Oct-2025 11:46:05 America/Boise] PHP Fatal error:  Uncaught Error: Undefined constant PDO::MYSQL_ATTR_SSL_MODE in /home2/ichrqhmy/public_html/website_2eb58030/testmysql/index.php:63
+Stack trace:
+#0 {main}
+  thrown in /home2/ichrqhmy/public_html/website_2eb58030/testmysql/index.php on line 63
