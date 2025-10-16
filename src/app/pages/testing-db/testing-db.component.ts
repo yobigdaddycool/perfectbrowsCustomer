@@ -9,9 +9,9 @@ import { lastValueFrom } from 'rxjs';
   imports: [CommonModule],
   template: `
     <div style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
-      <h1>testingDB Page</h1>
+      <h1>testingDB Page - Centralized API</h1>
       <p style="font-size: 24px; color: #333;">hi how ya doing</p>
-      <p style="color: #666; margin-top: 20px;">This is the temporary landing page for testing.</p>
+      <p style="color: #666; margin-top: 20px;">This page uses the centralized API endpoint.</p>
       
       <div style="margin-top: 30px;">
         <button 
@@ -35,6 +35,26 @@ import { lastValueFrom } from 'rxjs';
           {{ isTesting ? 'Testing...' : 'Test Database Connection' }}
         </button>
         
+        <button 
+          (click)="onGetTestDataClick()" 
+          [disabled]="isTesting"
+          style="
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background-color 0.3s;
+          "
+          [style.background-color]="isTesting ? '#6c757d' : '#28a745'"
+          [style.cursor]="isTesting ? 'not-allowed' : 'pointer'"
+        >
+          {{ isTesting ? 'Loading...' : 'Get Test Data' }}
+        </button>
+        
         <div *ngIf="testResult" style="margin-top: 20px; padding: 15px; border-radius: 6px; background-color: #f8f9fa; border: 1px solid #dee2e6;">
           <h3 style="margin-top: 0; color: #495057;">Test Result:</h3>
           <p style="color: #6c757d; margin: 0;">{{ testResult }}</p>
@@ -50,6 +70,16 @@ import { lastValueFrom } from 'rxjs';
           <h3 style="margin-top: 0; color: #0c5460;">Debug Info:</h3>
           <pre style="color: #0c5460; margin: 0; text-align: left; font-size: 12px; white-space: pre-wrap;">{{ debugInfo }}</pre>
         </div>
+
+        <div *ngIf="testData.length > 0" style="margin-top: 20px; padding: 15px; border-radius: 6px; background-color: #e2e3e5; border: 1px solid #d6d8db;">
+          <h3 style="margin-top: 0; color: #383d41;">Test Data ({{ testData.length }} records):</h3>
+          <div *ngFor="let item of testData" style="text-align: left; margin: 10px 0; padding: 10px; background: white; border-radius: 4px;">
+            <p style="margin: 2px 0;"><strong>ID:</strong> {{ item.id }}</p>
+            <p style="margin: 2px 0;"><strong>Name:</strong> {{ item.name }}</p>
+            <p style="margin: 2px 0;"><strong>Email:</strong> {{ item.email }}</p>
+            <p style="margin: 2px 0;"><strong>Created:</strong> {{ item.created_at }}</p>
+          </div>
+        </div>
       </div>
     </div>
   `
@@ -59,32 +89,45 @@ export class TestingDbComponent {
   apiError: string = '';
   errorDetails: string = '';
   debugInfo: string = '';
+  testData: any[] = [];
   isTesting: boolean = false;
   buttonHover: boolean = false;
 
   constructor(private http: HttpClient) {}
 
-  async onTestButtonClick() {
+  async callApi(action: string) {
     this.isTesting = true;
     this.testResult = '';
     this.apiError = '';
     this.errorDetails = '';
     this.debugInfo = '';
     
+    if (action === 'get-test-data') {
+      this.testData = [];
+    }
+    
     try {
-      // Call the PHP backend for database testing
-      const url = 'https://website-2eb58030.ich.rqh.mybluehost.me/test-db-connection.php';
+      // Call the centralized API endpoint
+      const url = `https://website-2eb58030.ich.rqh.mybluehost.me/api.php?action=${action}&t=${Date.now()}`;
       const response: any = await lastValueFrom(
-  this.http.get(`${url}?t=${Date.now()}`, { responseType: 'json' })
-);
+        this.http.get(url, { responseType: 'json' })
+      );
       
-      console.log('Full API Response:', response);
+      console.log('API Response:', response);
       
       if (response.success) {
-        this.testResult = `✅ ${response.message} - MySQL Version: ${response.queryResult?.mysql_version} - Current Time: ${response.queryResult?.current_time_value}`;
-        if (response.testData && response.testData.length > 0) {
-          this.testResult += ` - Found ${response.testData.length} test records`;
+        this.testResult = `✅ ${response.message}`;
+        
+        if (action === 'test-connection' && response.data?.queryResult) {
+          const result = response.data.queryResult;
+          this.testResult += ` - MySQL Version: ${result.mysql_version} - Current Time: ${result.current_time_value}`;
         }
+        
+        if (action === 'get-test-data' && response.data?.testData) {
+          this.testData = response.data.testData;
+          this.testResult += ` - Found ${this.testData.length} test records`;
+        }
+        
         if (response.debug) {
           this.debugInfo = JSON.stringify(response.debug, null, 2);
         }
@@ -96,7 +139,7 @@ export class TestingDbComponent {
         }
       }
     } catch (error: any) {
-      console.error('Full error object:', error);
+      console.error('API Error:', error);
       
       if (error instanceof HttpErrorResponse) {
         this.testResult = '❌ HTTP Error occurred';
@@ -105,7 +148,6 @@ export class TestingDbComponent {
         
         if (error.error) {
           try {
-            // Try to parse error response if it's JSON
             const errorObj = typeof error.error === 'string' ? JSON.parse(error.error) : error.error;
             this.debugInfo = JSON.stringify(errorObj, null, 2);
           } catch (e) {
@@ -113,11 +155,19 @@ export class TestingDbComponent {
           }
         }
       } else {
-        this.testResult = '❌ Failed to connect to PHP backend';
+        this.testResult = '❌ Failed to connect to API';
         this.apiError = error.message || 'Network error occurred';
       }
     } finally {
       this.isTesting = false;
     }
+  }
+
+  async onTestButtonClick() {
+    await this.callApi('test-connection');
+  }
+
+  async onGetTestDataClick() {
+    await this.callApi('get-test-data');
   }
 }
