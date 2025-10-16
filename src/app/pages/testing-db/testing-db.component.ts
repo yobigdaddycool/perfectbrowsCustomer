@@ -71,24 +71,53 @@ import { lastValueFrom } from 'rxjs';
           <pre style="color: #0c5460; margin: 0; text-align: left; font-size: 12px; white-space: pre-wrap;">{{ debugInfo }}</pre>
         </div>
 
-        <div *ngIf="testData.length > 0" style="margin-top: 20px; padding: 15px; border-radius: 6px; background-color: #e2e3e5; border: 1px solid #d6d8db;">
-          <h3 style="margin-top: 0; color: #383d41;">Test Data ({{ testData.length }} records):</h3>
-          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-            <thead>
-              <tr style="background-color: #f8f9fa;">
-                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">ID</th>
-                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Name</th>
-                <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of testData" style="border-bottom: 1px solid #dee2e6;">
-                <td style="padding: 8px;">{{ item.id }}</td>
-                <td style="padding: 8px;">{{ item.name }}</td>
-                <td style="padding: 8px;">{{ item.email }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Test Data Table -->
+        <div *ngIf="testData.length > 0" style="margin-top: 30px;">
+          <h3 style="color: #495057;">Test Data Table ({{ testData.length }} records)</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <thead>
+                <tr style="background-color: #007bff; color: white;">
+                  <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #0056b3;">ID</th>
+                  <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #0056b3;">Name</th>
+                  <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #0056b3;">Email</th>
+                  <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #0056b3;">Created At</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of testData; let i = index" 
+                    [style.background-color]="i % 2 === 0 ? '#f8f9fa' : 'white'"
+                    style="transition: background-color 0.2s;">
+                  <td style="padding: 12px 15px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                    {{ item.id }}
+                  </td>
+                  <td style="padding: 12px 15px; border-bottom: 1px solid #dee2e6; color: #495057;">
+                    {{ item.name }}
+                  </td>
+                  <td style="padding: 12px 15px; border-bottom: 1px solid #dee2e6; color: #495057;">
+                    {{ item.email }}
+                  </td>
+                  <td style="padding: 12px 15px; border-bottom: 1px solid #dee2e6; color: #6c757d; font-size: 14px;">
+                    {{ formatDate(item.created_at) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Summary -->
+          <div style="margin-top: 15px; text-align: left; padding: 10px 15px; background-color: #e9ecef; border-radius: 4px;">
+            <p style="margin: 0; color: #495057; font-size: 14px;">
+              <strong>Total Records:</strong> {{ testData.length }} 
+              <span style="margin-left: 20px;"><strong>Latest:</strong> {{ getLatestRecordDate() }}</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="hasTestDataLoaded && testData.length === 0" style="margin-top: 20px; padding: 20px; border-radius: 6px; background-color: #fff3cd; border: 1px solid #ffeaa7;">
+          <h3 style="margin-top: 0; color: #856404;">No Test Data Found</h3>
+          <p style="color: #856404; margin: 0;">The test_data table exists but contains no records.</p>
         </div>
       </div>
     </div>
@@ -100,6 +129,7 @@ export class TestingDbComponent {
   errorDetails: string = '';
   debugInfo: string = '';
   testData: any[] = [];
+  hasTestDataLoaded: boolean = false;
   isTesting: boolean = false;
   buttonHover: boolean = false;
 
@@ -113,7 +143,7 @@ export class TestingDbComponent {
     this.debugInfo = '';
     
     if (action === 'get-test-data') {
-      this.testData = [];
+      this.hasTestDataLoaded = true;
     }
     
     try {
@@ -179,5 +209,31 @@ export class TestingDbComponent {
 
   async onGetTestDataClick() {
     await this.callApi('get-test-data');
+  }
+
+  // Format date for better display
+  formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  // Get the latest record date for summary
+  getLatestRecordDate(): string {
+    if (this.testData.length === 0) return 'N/A';
+    
+    const latestRecord = this.testData[0]; // Assuming data is sorted by created_at DESC
+    return this.formatDate(latestRecord.created_at);
   }
 }
