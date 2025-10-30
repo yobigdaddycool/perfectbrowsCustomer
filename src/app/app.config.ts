@@ -6,7 +6,7 @@ import {
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
-import { provideHttpClient } from '@angular/common/http'; // ✅ Added this import
+import { provideHttpClient, withFetch } from '@angular/common/http'; // ✅ Added withFetch for SSR
 
 import { routes } from './app.routes';
 
@@ -24,7 +24,7 @@ export const appConfig: ApplicationConfig = {
     // Enables client hydration for Angular SSR (Server-Side Rendering)
     provideClientHydration(withEventReplay()),
 
-    // ✅ Enables HttpClient across all standalone components
-    provideHttpClient()
+    // ✅ Enables HttpClient across all standalone components with fetch API for SSR
+    provideHttpClient(withFetch())
   ]
 };
