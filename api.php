@@ -75,11 +75,14 @@ try {
         case 'get-stylists':
             getStylists($response);
             break;
+        case 'get-customer':
+            getCustomer($response);
+            break;
         default:
             $response['success'] = false;
             $response['message'] = 'No action specified';
-            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists';
-            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists";
+            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer';
+            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer";
             break;
     }
     
@@ -336,6 +339,93 @@ function getStylists(&$response) {
     } catch (PDOException $e) {
         $response['success'] = false;
         $response['message'] = "Failed to retrieve stylists";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    }
+}
+
+function getCustomer(&$response) {
+    global $pdo;
+
+    try {
+        $customerId = $_GET['customerId'] ?? '';
+
+        if (empty($customerId)) {
+            $response['success'] = false;
+            $response['message'] = "Customer ID is required";
+            $response['error'] = "Missing customerId parameter";
+            return;
+        }
+
+        $response['debug'][] = "Fetching customer ID: $customerId";
+
+        // Get customer basic info
+        $sql = "SELECT
+                c.customer_id,
+                c.first_name,
+                c.last_name,
+                c.phone,
+                c.email,
+                c.sms_consent,
+                c.email_consent,
+                c.created_at,
+                cp.file_path as profile_photo
+            FROM customers c
+            LEFT JOIN customer_photos cp ON c.customer_id = cp.customer_id AND cp.is_primary = 1
+            WHERE c.customer_id = :customerId";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':customerId' => $customerId]);
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$customer) {
+            $response['success'] = false;
+            $response['message'] = "Customer not found";
+            $response['error'] = "No customer with ID: $customerId";
+            $response['debug'][] = "Customer ID $customerId does not exist";
+            return;
+        }
+
+        // Get most recent appointment details
+        $appointmentSql = "SELECT
+                a.appointment_id,
+                a.appointment_date,
+                a.appointment_time,
+                a.stylist_id,
+                a.service_id,
+                a.price,
+                a.notes,
+                vt.type_name as visit_type,
+                s.first_name as stylist_first_name,
+                s.last_name as stylist_last_name,
+                srv.service_name
+            FROM appointments a
+            LEFT JOIN visit_types vt ON a.visit_type_id = vt.visit_type_id
+            LEFT JOIN stylists s ON a.stylist_id = s.stylist_id
+            LEFT JOIN services srv ON a.service_id = srv.service_id
+            WHERE a.customer_id = :customerId
+            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+            LIMIT 1";
+
+        $stmt = $pdo->prepare($appointmentSql);
+        $stmt->execute([':customerId' => $customerId]);
+        $lastAppointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Combine appointment date and time if available
+        if ($lastAppointment && $lastAppointment['appointment_date'] && $lastAppointment['appointment_time']) {
+            $lastAppointment['appointment_datetime'] = $lastAppointment['appointment_date'] . ' ' . $lastAppointment['appointment_time'];
+        }
+
+        $customer['last_appointment'] = $lastAppointment;
+
+        $response['success'] = true;
+        $response['message'] = "Customer retrieved successfully";
+        $response['data'] = $customer;
+        $response['debug'][] = "Customer data loaded for: " . $customer['first_name'] . " " . $customer['last_name'];
+
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to retrieve customer";
         $response['error'] = $e->getMessage();
         $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
     }
