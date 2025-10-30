@@ -53,6 +53,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   stream: MediaStream | null = null;
   cameraError: string | null = null;
   photoFileName: string | null = null;
+  shouldDeletePhoto = false; // Flag to track if photo should be deleted on update
 
   // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
@@ -184,6 +185,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
     // Load profile photo if available
     if (data.profile_photo) {
       this.capturedPhoto = `https://website-2eb58030.ich.rqh.mybluehost.me/${data.profile_photo}`;
+      console.log('📸 Profile photo loaded:', data.profile_photo);
+    } else {
+      // Clear photo if none exists (e.g., after deletion)
+      this.capturedPhoto = null;
+      console.log('📸 No profile photo found - displaying placeholder');
     }
 
     console.log('Customer data populated:', this.customer);
@@ -240,6 +246,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('💾 Updating customer ID:', this.customerId);
     console.log('📋 Current customer data:', this.customer);
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
+    console.log('🗑️ Should delete photo?', this.shouldDeletePhoto);
 
     // Prepare data for API
     const updateData: any = {
@@ -252,8 +259,13 @@ export class RegisterComponent implements OnInit, OnDestroy {
       emailConsent: this.customer.emailConsent ? 1 : 0
     };
 
+    // Handle photo deletion or upload
+    if (this.shouldDeletePhoto) {
+      updateData.deletePhoto = true;
+      console.log('🗑️ ✅ REQUESTING PHOTO DELETION - deletePhoto flag set to TRUE');
+    }
     // Include photo ONLY if it's a new base64 capture (not an existing URL)
-    if (this.capturedPhoto && this.capturedPhoto.startsWith('data:image')) {
+    else if (this.capturedPhoto && this.capturedPhoto.startsWith('data:image')) {
       // Only send the base64 string, truncate for logging
       updateData.photo = this.capturedPhoto;
       const photoPreview = this.capturedPhoto.substring(0, 100) + '...';
@@ -280,9 +292,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
         this.isLoadingCustomer = false;
 
         if (response.success) {
+          // Handle photo deletion result
+          if (this.shouldDeletePhoto) {
+            this.capturedPhoto = null;
+            this.shouldDeletePhoto = false;
+            console.log('🗑️ Photo deleted successfully - clearing from UI');
+          }
+
           // Update the captured photo path if a new one was uploaded
           if (response.data?.photoPath) {
             this.capturedPhoto = `https://website-2eb58030.ich.rqh.mybluehost.me/${response.data.photoPath}`;
+            this.shouldDeletePhoto = false; // Reset flag if new photo was uploaded
             console.log('📸 Photo updated:', response.data.photoPath);
           }
 
@@ -298,6 +318,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
+
+          // Reload customer data to ensure UI is in sync with database
+          if (this.isEditMode && this.customerId) {
+            console.log('🔄 Reloading customer data after update...');
+            setTimeout(() => {
+              this.loadCustomerData(this.customerId!);
+            }, 500);
+          }
         } else {
           this.cdr.detectChanges();
           this.showToastMessage('Failed to update customer: ' + response.message);
@@ -594,6 +622,7 @@ hideToast() {
     console.log('📸 Using captured photo');
     console.log('📸 Photo preview length:', this.photoPreview?.length);
     this.capturedPhoto = this.photoPreview;
+    this.shouldDeletePhoto = false; // Reset deletion flag when new photo is captured
     console.log('📸 Captured photo set, length:', this.capturedPhoto?.length);
     this.closeCamera();
     this.showToastMessage('Photo captured successfully!');
@@ -612,9 +641,13 @@ hideToast() {
   }
 
   removePhoto() {
+    console.log('🗑️ Remove photo clicked');
     this.capturedPhoto = null;
     this.photoPreview = null;
     this.photoFileName = null;
+    this.shouldDeletePhoto = true; // Flag for deletion on next update
+    this.checkFormDirty(); // Mark form as dirty
+    console.log('🗑️ Photo marked for deletion');
   }
 
   closeCamera() {
@@ -651,7 +684,9 @@ hideToast() {
       reader.onload = (e: any) => {
         this.capturedPhoto = e.target.result;
         this.photoFileName = file.name;
+        this.shouldDeletePhoto = false; // Reset deletion flag when new photo is uploaded
         this.showToastMessage('Photo uploaded successfully!');
+        this.checkFormDirty(); // Mark form as dirty when photo changes
       };
       reader.readAsDataURL(file);
     }
