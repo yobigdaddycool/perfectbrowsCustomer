@@ -84,7 +84,7 @@ export class SearchComponent implements OnInit {
   services: Service[] = [];
   visitTypes: VisitType[] = [];
 
-  // API URL
+  // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
 
   constructor(

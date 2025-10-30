@@ -50,7 +50,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   cameraError: string | null = null;
   photoFileName: string | null = null;
 
-  // API URL
+  // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
 
   constructor(
@@ -225,28 +225,38 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.http.post<any>(url, updateData).subscribe({
       next: (response) => {
         console.log('✅ Update response:', response);
+        console.log('🔄 Setting isLoadingCustomer to FALSE');
         this.isLoadingCustomer = false;
-        this.cdr.detectChanges();
 
         if (response.success) {
-          this.showToastMessage('Customer updated successfully!');
-          console.log('✅ Customer updated successfully');
-
           // Update the captured photo path if a new one was uploaded
           if (response.data?.photoPath) {
             this.capturedPhoto = `https://website-2eb58030.ich.rqh.mybluehost.me/${response.data.photoPath}`;
             console.log('📸 Photo updated:', response.data.photoPath);
           }
+
+          console.log('🔄 Triggering change detection');
+          this.cdr.detectChanges();
+
+          // Show success message in next tick to avoid change detection error
+          setTimeout(() => {
+            this.showToastMessage('Customer updated successfully!');
+            console.log('✅ Customer updated successfully');
+          }, 0);
         } else {
+          this.cdr.detectChanges();
           this.showToastMessage('Failed to update customer: ' + response.message);
           console.error('❌ Update failed:', response.message);
         }
       },
       error: (error) => {
         console.error('❌ HTTP Error updating customer:', error);
+        console.log('🔄 Setting isLoadingCustomer to FALSE (error)');
         this.isLoadingCustomer = false;
         this.cdr.detectChanges();
-        this.showToastMessage('Error updating customer. Please try again.');
+        setTimeout(() => {
+          this.showToastMessage('Error updating customer. Please try again.');
+        }, 0);
       }
     });
   }
@@ -509,9 +519,13 @@ hideToast() {
   }
 
   usePhoto() {
+    console.log('📸 Using captured photo');
+    console.log('📸 Photo preview length:', this.photoPreview?.length);
     this.capturedPhoto = this.photoPreview;
+    console.log('📸 Captured photo set, length:', this.capturedPhoto?.length);
     this.closeCamera();
     this.showToastMessage('Photo captured successfully!');
+    this.cdr.detectChanges(); // Ensure UI updates
   }
 
   retakePhoto() {

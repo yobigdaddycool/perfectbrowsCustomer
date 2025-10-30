@@ -11,7 +11,7 @@ export class DatabaseConnectionService {
   // Signal to track connection status
   connectionStatus = signal<ConnectionStatus>('checking');
 
-  // API endpoint URL - using the Bluehost PHP API (same as testing-db component)
+  // API endpoint URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
 
   // Check interval in milliseconds (5 seconds)
