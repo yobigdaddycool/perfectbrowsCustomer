@@ -104,10 +104,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
       next: (response) => {
         console.log('✅ Customer data received:', response);
         this.isLoadingCustomer = false;
+        this.cdr.detectChanges(); // Force change detection for zoneless mode
 
         if (response.success && response.data) {
           console.log('📝 Populating form with customer data...');
           this.populateCustomerData(response.data);
+          this.cdr.detectChanges(); // Force UI update after populating data
         } else {
           console.error('❌ Failed to load customer:', response.message);
           this.showToastMessage('Failed to load customer data: ' + response.message);
@@ -122,6 +124,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
           error: error.error
         });
         this.isLoadingCustomer = false;
+        this.cdr.detectChanges(); // Force change detection even on error
         this.showToastMessage('Error loading customer data');
       }
     });
@@ -185,9 +188,67 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   updateCustomer() {
-    // TODO: Implement API call to update customer
-    console.log('Updating customer ID:', this.customerId, this.customer);
-    this.showToastMessage('Customer updated successfully!');
+    console.log('💾 Updating customer ID:', this.customerId);
+    console.log('📋 Current customer data:', this.customer);
+    console.log('📸 Captured photo exists?', !!this.capturedPhoto);
+
+    // Prepare data for API
+    const updateData: any = {
+      customerId: this.customerId,
+      firstName: this.customer.firstName,
+      lastName: this.customer.lastName,
+      phone: this.customer.phone,
+      email: this.customer.email,
+      smsConsent: this.customer.smsConsent ? 1 : 0,
+      emailConsent: this.customer.emailConsent ? 1 : 0
+    };
+
+    // Include photo if it was captured/changed
+    if (this.capturedPhoto) {
+      // Only send the base64 string, truncate for logging
+      updateData.photo = this.capturedPhoto;
+      const photoPreview = this.capturedPhoto.substring(0, 100) + '...';
+      console.log('📸 Including photo in update (preview):', photoPreview);
+      console.log('📸 Photo length:', this.capturedPhoto.length, 'characters');
+    } else {
+      console.log('⚠️ No photo to include');
+    }
+
+    const url = `${this.apiUrl}?action=update-customer`;
+    console.log('📡 Sending update to:', url);
+    console.log('📦 Update data:', { ...updateData, photo: updateData.photo ? '[BASE64_DATA]' : undefined });
+
+    // Show loading state
+    const originalButtonText = 'Update Customer';
+    this.isLoadingCustomer = true;
+
+    this.http.post<any>(url, updateData).subscribe({
+      next: (response) => {
+        console.log('✅ Update response:', response);
+        this.isLoadingCustomer = false;
+        this.cdr.detectChanges();
+
+        if (response.success) {
+          this.showToastMessage('Customer updated successfully!');
+          console.log('✅ Customer updated successfully');
+
+          // Update the captured photo path if a new one was uploaded
+          if (response.data?.photoPath) {
+            this.capturedPhoto = `https://website-2eb58030.ich.rqh.mybluehost.me/${response.data.photoPath}`;
+            console.log('📸 Photo updated:', response.data.photoPath);
+          }
+        } else {
+          this.showToastMessage('Failed to update customer: ' + response.message);
+          console.error('❌ Update failed:', response.message);
+        }
+      },
+      error: (error) => {
+        console.error('❌ HTTP Error updating customer:', error);
+        this.isLoadingCustomer = false;
+        this.cdr.detectChanges();
+        this.showToastMessage('Error updating customer. Please try again.');
+      }
+    });
   }
 
   onClear() {
