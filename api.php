@@ -183,7 +183,7 @@ function searchCustomers(&$response) {
             c.last_name,
             c.phone,
             c.email,
-            cp.file_path as profile_photo,
+            MAX(cp.file_path) as profile_photo,
             MAX(a.appointment_date) as last_visit,
             COUNT(DISTINCT a.appointment_id) as total_visits,
             (SELECT a2.appointment_date
