@@ -168,7 +168,7 @@
           @if (!isSearching() && paginatedResults().length > 0) {
             <div class="results-grid">
               @for (customer of paginatedResults(); track customer.customer_id) {
-                <div class="customer-card">
+                <div class="customer-card" (click)="openCustomer(customer.customer_id)">
                   <div class="card-photo">
                     <img [src]="getPhotoUrl(customer.profile_photo)" [alt]="customer.first_name + ' ' + customer.last_name" />
                   </div>
@@ -179,12 +179,6 @@
                         <span class="label">Phone:</span>
                         <span class="value">{{ formatPhone(customer.phone) }}</span>
                       </div>
-                      @if (customer.email) {
-                        <div class="detail-row">
-                          <span class="label">Email:</span>
-                          <span class="value">{{ customer.email }}</span>
-                        </div>
-                      }
                       <div class="detail-row">
                         <span class="label">Last Visit:</span>
                         <span class="value">{{ formatDate(customer.last_visit) }}</span>

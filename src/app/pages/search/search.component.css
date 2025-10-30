@@ -257,11 +257,13 @@ input:focus, select:focus {
   border-radius: 12px;
   background: #fff;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .customer-card:hover {
-  box-shadow: 0 4px 12px rgba(217, 70, 239, 0.1);
+  box-shadow: 0 4px 12px rgba(217, 70, 239, 0.15);
   border-color: #d946ef;
+  transform: translateY(-2px);
 }
 
 .card-photo {
@@ -274,6 +276,8 @@ input:focus, select:focus {
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  display: block;
 }
 
 .card-content {

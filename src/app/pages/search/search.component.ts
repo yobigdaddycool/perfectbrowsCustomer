@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
 
 interface SearchFilters {
@@ -88,6 +89,7 @@ export class SearchComponent implements OnInit {
 
   constructor(
     private http: HttpClient,
+    private router: Router,
     public dbConnection: DatabaseConnectionService
   ) {}
 
@@ -313,8 +315,13 @@ export class SearchComponent implements OnInit {
 
   getPhotoUrl(photoPath: string | null): string {
     if (!photoPath) {
-      return 'assets/default-avatar.png'; // You'll need to add a default avatar image
+      return 'assets/default-avatar.svg';
     }
     return `https://website-2eb58030.ich.rqh.mybluehost.me/${photoPath}`;
+  }
+
+  openCustomer(customerId: number) {
+    console.log('📂 Opening customer in edit mode:', customerId);
+    this.router.navigate(['/register', customerId]);
   }
 }

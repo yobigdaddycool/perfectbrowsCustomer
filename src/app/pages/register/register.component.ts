@@ -1,7 +1,8 @@
-﻿import { Component, ViewChild, ElementRef, OnDestroy, ChangeDetectorRef } from '@angular/core';
+﻿import { Component, ViewChild, ElementRef, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
 
 @Component({
@@ -11,9 +12,15 @@ import { DatabaseConnectionService } from '../../services/database-connection.se
   templateUrl: './register.component.html',
   styleUrls: ['./register.component.css']
 })
-export class RegisterComponent implements OnDestroy {
+export class RegisterComponent implements OnInit, OnDestroy {
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvasElement') canvasElement!: ElementRef<HTMLCanvasElement>;
+
+  // Edit mode properties
+  isEditMode = false;
+  customerId: number | null = null;
+  isLoadingCustomer = false;
+
   customer = {
     firstName: '',
     lastName: '',
@@ -43,20 +50,120 @@ export class RegisterComponent implements OnDestroy {
   cameraError: string | null = null;
   photoFileName: string | null = null;
 
+  // API URL
+  private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
+
   constructor(
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
     public dbConnection: DatabaseConnectionService
   ) {}
+
+  ngOnInit() {
+    console.log('🚀 RegisterComponent initialized');
+
+    // Check if we're in edit mode by looking for an ID in the route
+    this.route.params.subscribe(params => {
+      const id = params['id'];
+      console.log('📋 Route params:', params);
+      console.log('🆔 Customer ID from route:', id);
+
+      if (id) {
+        this.isEditMode = true;
+        this.customerId = +id; // Convert to number
+        console.log('✏️ Edit mode activated for customer ID:', this.customerId);
+        this.loadCustomerData(this.customerId);
+
+        // Safety timeout - if loading takes more than 10 seconds, show form anyway
+        setTimeout(() => {
+          if (this.isLoadingCustomer) {
+            console.warn('⚠️ Loading timeout - forcing form to show');
+            this.isLoadingCustomer = false;
+            this.showToastMessage('Loading took too long. Please check connection.');
+          }
+        }, 10000);
+      } else {
+        console.log('➕ New customer mode');
+      }
+    });
+  }
 
   ngOnDestroy() {
     this.stopCamera();
   }
 
+  loadCustomerData(customerId: number) {
+    this.isLoadingCustomer = true;
+    const url = `${this.apiUrl}?action=get-customer&customerId=${customerId}`;
+
+    console.log('🔍 Loading customer data for ID:', customerId);
+    console.log('📡 API URL:', url);
+
+    this.http.get<any>(url).subscribe({
+      next: (response) => {
+        console.log('✅ Customer data received:', response);
+        this.isLoadingCustomer = false;
+
+        if (response.success && response.data) {
+          console.log('📝 Populating form with customer data...');
+          this.populateCustomerData(response.data);
+        } else {
+          console.error('❌ Failed to load customer:', response.message);
+          this.showToastMessage('Failed to load customer data: ' + response.message);
+        }
+      },
+      error: (error) => {
+        console.error('❌ HTTP Error loading customer:', error);
+        console.error('Error details:', {
+          status: error.status,
+          statusText: error.statusText,
+          message: error.message,
+          error: error.error
+        });
+        this.isLoadingCustomer = false;
+        this.showToastMessage('Error loading customer data');
+      }
+    });
+  }
+
+  populateCustomerData(data: any) {
+    // Populate basic customer info
+    this.customer.firstName = data.first_name || '';
+    this.customer.lastName = data.last_name || '';
+    this.customer.phone = data.phone || '';
+    this.customer.email = data.email || '';
+    this.customer.smsConsent = data.sms_consent === 1 || data.sms_consent === true;
+    this.customer.emailConsent = data.email_consent === 1 || data.email_consent === true;
+
+    // Populate most recent appointment data if available
+    if (data.last_appointment) {
+      this.customer.stylist = data.last_appointment.stylist_id || '';
+      this.customer.service = data.last_appointment.service_id || '';
+      this.customer.visitType = data.last_appointment.visit_type || 'Return';
+      this.customer.notes = data.last_appointment.notes || '';
+      this.customer.price = data.last_appointment.price || '';
+
+      // Parse date/time if available
+      if (data.last_appointment.appointment_datetime) {
+        const datetime = new Date(data.last_appointment.appointment_datetime);
+        this.customer.date = datetime.toISOString().split('T')[0];
+        this.customer.time = datetime.toTimeString().slice(0, 5);
+      }
+    }
+
+    // Load profile photo if available
+    if (data.profile_photo) {
+      this.capturedPhoto = `https://website-2eb58030.ich.rqh.mybluehost.me/${data.profile_photo}`;
+    }
+
+    console.log('Customer data populated:', this.customer);
+  }
+
   onSubmit() {
     this.fieldErrors = {};
     const errors = this.validateForm();
-    
+
     if (Object.keys(errors).length > 0) {
       this.fieldErrors = errors;
       this.showToastMessage('Please fix the errors in the form.');
@@ -64,8 +171,23 @@ export class RegisterComponent implements OnDestroy {
       return;
     }
 
-    console.log('Customer Data:', this.customer);
+    if (this.isEditMode && this.customerId) {
+      this.updateCustomer();
+    } else {
+      this.createCustomer();
+    }
+  }
+
+  createCustomer() {
+    // TODO: Implement API call to create customer
+    console.log('Creating new customer:', this.customer);
     this.showToastMessage('Customer saved successfully!');
+  }
+
+  updateCustomer() {
+    // TODO: Implement API call to update customer
+    console.log('Updating customer ID:', this.customerId, this.customer);
+    this.showToastMessage('Customer updated successfully!');
   }
 
   onClear() {

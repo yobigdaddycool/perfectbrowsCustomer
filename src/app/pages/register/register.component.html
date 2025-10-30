@@ -3,17 +3,25 @@
     <div class="header">
       <div class="brand">
         <div class="logo" aria-hidden="true"></div>
-        <h1>Salon Customer Manager</h1>
+        <h1>{{ isEditMode ? 'Edit Customer' : 'Register New Customer' }}</h1>
       </div>
       <div class="badges">
-        <span class="chip">Landing — Register</span>
+        <span class="chip">{{ isEditMode ? 'Edit Mode' : 'Landing — Register' }}</span>
         <span class="chip">Angular App</span>
         <span class="chip">Magenta Theme</span>
       </div>
     </div>
 
     <form class="content" #customerForm="ngForm" (ngSubmit)="onSubmit()">
-      <div class="grid">
+      <!-- Loading state -->
+      @if (isLoadingCustomer) {
+        <div class="loading-state" style="text-align: center; padding: 40px;">
+          <div class="spinner" style="margin: 0 auto 20px;"></div>
+          <p>Loading customer data...</p>
+        </div>
+      }
+
+      <div class="grid" [style.display]="isLoadingCustomer ? 'none' : 'grid'">
         <div class="col">
           <div class="row">
             <div class="field">
@@ -269,7 +277,9 @@
 
       <div class="actions">
         <button type="button" class="btn btn-outline" (click)="onClear()">Clear</button>
-        <button type="submit" class="btn btn-primary">Save Customer</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer">
+          {{ isEditMode ? 'Update Customer' : 'Save Customer' }}
+        </button>
       </div>
 
       <!-- Connection Status Indicator -->
