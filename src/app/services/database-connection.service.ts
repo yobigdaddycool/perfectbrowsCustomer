@@ -11,8 +11,8 @@ export class DatabaseConnectionService {
   // Signal to track connection status
   connectionStatus = signal<ConnectionStatus>('checking');
 
-  // API endpoint URL - using the server's local endpoint
-  private apiUrl = '/api/test-db-connection';
+  // API endpoint URL - using the Bluehost PHP API (same as testing-db component)
+  private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
 
   // Check interval in milliseconds (5 seconds)
   private checkInterval = 5000;
@@ -32,10 +32,10 @@ export class DatabaseConnectionService {
   }
 
   private checkConnection() {
-    this.http.get<any>(this.apiUrl, {
-      // Add a timestamp to prevent caching
-      params: { t: Date.now().toString() }
-    }).subscribe({
+    // Call the PHP API with action=test-connection and cache-busting timestamp
+    const url = `${this.apiUrl}?action=test-connection&t=${Date.now()}`;
+
+    this.http.get<any>(url, { responseType: 'json' }).subscribe({
       next: (response) => {
         if (response.success) {
           this.connectionStatus.set('connected');
