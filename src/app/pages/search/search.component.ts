@@ -122,16 +122,22 @@ export class SearchComponent implements OnInit {
   }
 
   onSearch() {
+    console.log('🔍 === SEARCH BUTTON CLICKED ===');
+    console.log('📋 Current filters:', this.filters);
+
     // Validate at least one field is filled
     if (!this.filters.firstName && !this.filters.lastName && !this.filters.phone &&
         !this.filters.dateFrom && !this.filters.dateTo && !this.filters.serviceId && !this.filters.visitTypeId) {
+      console.log('❌ Validation failed: No search criteria provided');
       this.searchError = 'Please enter at least one search criteria';
       return;
     }
 
+    console.log('✅ Validation passed');
     this.isSearching = true;
     this.searchError = null;
     this.hasSearched = true;
+    console.log('🔄 isSearching set to TRUE');
 
     // Build query parameters
     const params = new URLSearchParams();
@@ -145,16 +151,27 @@ export class SearchComponent implements OnInit {
     if (this.filters.serviceId) params.append('serviceId', this.filters.serviceId);
     if (this.filters.visitTypeId) params.append('visitTypeId', this.filters.visitTypeId);
 
+    const fullUrl = `${this.apiUrl}?${params.toString()}`;
+    console.log('🌐 Full API URL:', fullUrl);
+    console.log('📤 Calling API...');
+
     // Call API
-    this.http.get<any>(`${this.apiUrl}?${params.toString()}`).subscribe({
+    this.http.get<any>(fullUrl).subscribe({
       next: (response) => {
+        console.log('📥 API Response received:', response);
         this.isSearching = false;
+        console.log('🔄 isSearching set to FALSE');
+
         if (response.success) {
+          console.log('✅ Success! Found', response.data?.length || 0, 'results');
           this.searchResults = response.data || [];
           this.filteredResults = [...this.searchResults];
+          console.log('📊 Results stored:', this.searchResults);
           this.applySorting();
           this.updatePagination();
+          console.log('✅ Search completed successfully');
         } else {
+          console.log('❌ API returned failure:', response.message);
           this.searchError = response.message || 'Search failed';
           this.searchResults = [];
           this.filteredResults = [];
@@ -162,14 +179,24 @@ export class SearchComponent implements OnInit {
         }
       },
       error: (error) => {
+        console.log('❌ HTTP ERROR occurred:', error);
+        console.log('Error details:', {
+          message: error.message,
+          status: error.status,
+          statusText: error.statusText,
+          url: error.url,
+          error: error.error
+        });
         this.isSearching = false;
+        console.log('🔄 isSearching set to FALSE (error)');
         this.searchError = 'Error connecting to server. Please try again.';
-        console.error('Search error:', error);
         this.searchResults = [];
         this.filteredResults = [];
         this.updatePagination();
       }
     });
+
+    console.log('⏳ Waiting for API response...');
   }
 
   onClear() {
