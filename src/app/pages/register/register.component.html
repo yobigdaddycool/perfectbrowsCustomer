@@ -46,9 +46,9 @@
 
           <div class="row">
             <div class="field">
-              <label for="phone">Phone</label>
-              <input id="phone" type="tel" [(ngModel)]="customer.phone" name="phone" 
-                     placeholder="(555) 123‑4567" 
+              <label for="phone" class="req">Phone</label>
+              <input id="phone" type="tel" [(ngModel)]="customer.phone" name="phone"
+                     placeholder="(555) 123‑4567"
                      (blur)="validateField('phone', customer.phone)"
                      [class.error]="fieldErrors['phone']"
                      [class.flash-error]="isFlashing('phone')" />
@@ -140,21 +140,91 @@
           <div class="field">
             <label>Customer Photo</label>
             <div class="photo-box">
-              <div>
-                <div><strong>Camera placeholder</strong></div>
-                <div class="help">In Angular we'll add live camera + capture here.</div>
-              </div>
+              <!-- Empty state / Placeholder -->
+              @if (!cameraActive && !photoPreview && !capturedPhoto) {
+                <div class="placeholder">
+                  <div>
+                    <div><strong>No photo captured</strong></div>
+                    <div class="help">Use camera or upload a photo</div>
+                  </div>
+                </div>
+              }
+
+              <!-- Camera active - Live video -->
+              @if (cameraActive && !photoPreview) {
+                <div class="camera-container">
+                  <video #videoElement autoplay playsinline class="camera-video"></video>
+                </div>
+              }
+
+              <!-- Photo preview (before confirmation) -->
+              @if (photoPreview) {
+                <div class="photo-preview">
+                  <img [src]="photoPreview" alt="Photo preview" />
+                </div>
+              }
+
+              <!-- Final captured photo -->
+              @if (capturedPhoto && !cameraActive) {
+                <div class="photo-captured">
+                  <img [src]="capturedPhoto" alt="Captured photo" />
+                </div>
+              }
+
+              <!-- Hidden canvas for capturing -->
+              <canvas #canvasElement style="display: none;"></canvas>
             </div>
-            <div class="row" style="margin-top:10px">
-              <button type="button" class="btn btn-outline" disabled>Open Camera</button>
-              <button type="button" class="btn btn-outline" disabled>Upload Photo</button>
+
+            <!-- Button states -->
+            <div class="row" style="margin-top:10px; gap: 8px;">
+              <!-- Initial state buttons -->
+              @if (!cameraActive && !capturedPhoto) {
+                <button type="button" class="btn btn-outline" (click)="openCamera()">
+                  Open Camera
+                </button>
+                <button type="button" class="btn btn-outline" (click)="fileInput.click()">
+                  Upload Photo
+                </button>
+                <input #fileInput type="file" accept="image/*" style="display: none;" (change)="handleFileUpload($event)" />
+              }
+
+              <!-- Camera active, no preview yet -->
+              @if (cameraActive && !photoPreview) {
+                <button type="button" class="btn btn-primary" (click)="capturePhoto()">
+                  Capture Photo
+                </button>
+                <button type="button" class="btn btn-outline" (click)="closeCamera()">
+                  Cancel
+                </button>
+              }
+
+              <!-- Preview state (before confirmation) -->
+              @if (photoPreview) {
+                <button type="button" class="btn btn-primary" (click)="usePhoto()">
+                  Use This Photo
+                </button>
+                <button type="button" class="btn btn-outline" (click)="retakePhoto()">
+                  Retake Photo
+                </button>
+              }
+
+              <!-- Photo captured (final state) -->
+              @if (capturedPhoto && !cameraActive) {
+                <button type="button" class="btn btn-outline" (click)="changePhoto()">
+                  Change Photo
+                </button>
+                <button type="button" class="btn btn-outline" (click)="removePhoto()">
+                  Remove Photo
+                </button>
+              }
             </div>
           </div>
 
           <div class="row">
             <div class="field">
-              <label for="date">Date</label>
-              <input id="date" type="date" [(ngModel)]="customer.date" name="date" 
+              <label for="date" class="req">Date</label>
+              <input id="date" type="date" [(ngModel)]="customer.date" name="date"
+                     (blur)="validateField('date', customer.date)"
                      [class.error]="fieldErrors['date']"
                      [class.flash-error]="isFlashing('date')" />
               @if (fieldErrors['date']) {
@@ -201,7 +271,27 @@
         <button type="button" class="btn btn-outline" (click)="onClear()">Clear</button>
         <button type="submit" class="btn btn-primary">Save Customer</button>
       </div>
-      <p class="subtle">Angular Application • Full form validation enabled</p>
+
+      <!-- Connection Status Indicator -->
+      <div class="connection-status-container">
+        <div class="connection-status" [ngClass]="{
+          'connected': dbConnection.connectionStatus() === 'connected',
+          'disconnected': dbConnection.connectionStatus() === 'disconnected',
+          'checking': dbConnection.connectionStatus() === 'checking'
+        }">
+          @if (dbConnection.connectionStatus() === 'connected') {
+            <span class="status-dot"></span>
+            <span>Database Connection Successful</span>
+          } @else if (dbConnection.connectionStatus() === 'disconnected') {
+            <span class="status-dot"></span>
+            <span>DB Disconnected</span>
+          } @else {
+            <span class="status-dot"></span>
+            <span>Checking connection...</span>
+          }
+        </div>
+        <p class="subtle">Angular Application • Full form validation enabled</p>
+      </div>
     </form>
   </div>
 </div>

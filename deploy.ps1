@@ -36,7 +36,7 @@ foreach ($kv in $extraMap.GetEnumerator()) {
 
 cd .deploy_publish
 git add -A
-git commit -m "deploy: update db button"
+git commit -m "deploy: camera button update"
 git push -u origin deploy
 cd ..
 git worktree remove .deploy_publish -f 2>$null
