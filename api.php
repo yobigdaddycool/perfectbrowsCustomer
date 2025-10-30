@@ -457,8 +457,12 @@ function updateCustomer(&$response) {
         $smsConsent = isset($data['smsConsent']) ? (int)$data['smsConsent'] : 0;
         $emailConsent = isset($data['emailConsent']) ? (int)$data['emailConsent'] : 0;
         $photo = $data['photo'] ?? null; // Base64 photo string
+        $deletePhoto = isset($data['deletePhoto']) ? (bool)$data['deletePhoto'] : false;
 
         $response['debug'][] = "Updating customer ID: $customerId";
+        if ($deletePhoto) {
+            $response['debug'][] = "Photo deletion requested";
+        }
 
         // Validate required fields
         if (empty($customerId) || empty($firstName) || empty($lastName) || empty($phone)) {
@@ -503,6 +507,23 @@ function updateCustomer(&$response) {
         ]);
 
         $response['debug'][] = "Customer information updated";
+
+        // Handle photo deletion if requested
+        if ($deletePhoto) {
+            $response['debug'][] = "🗑️ Processing photo deletion...";
+
+            // Set all photos for this customer as non-primary (soft delete)
+            $deletePhotoSql = "UPDATE customer_photos SET is_primary = 0 WHERE customer_id = :customerId";
+            $stmt = $pdo->prepare($deletePhotoSql);
+            $stmt->execute([':customerId' => $customerId]);
+
+            $affectedRows = $stmt->rowCount();
+            $response['debug'][] = "🗑️ Photos affected by deletion: $affectedRows row(s)";
+            $response['debug'][] = "✅ Photo marked as deleted (is_primary = 0)";
+            $response['photoDeleted'] = true;
+        } else {
+            $response['debug'][] = "ℹ️ No photo deletion requested (deletePhoto = false or not set)";
+        }
 
         // Handle photo upload if provided
         $photoPath = null;
