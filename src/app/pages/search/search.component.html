@@ -108,32 +108,32 @@
             </select>
           </div>
 
-          @if (searchError) {
-            <div class="error-banner">{{ searchError }}</div>
+          @if (searchError()) {
+            <div class="error-banner">{{ searchError() }}</div>
           }
 
           <div class="actions">
             <button type="button" class="btn btn-outline" (click)="onClear()">Clear</button>
-            <button type="submit" class="btn btn-primary" [disabled]="isSearching">
-              {{ isSearching ? 'Searching...' : 'Search Customers' }}
+            <button type="submit" class="btn btn-primary" [disabled]="isSearching()">
+              {{ isSearching() ? 'Searching...' : 'Search Customers' }}
             </button>
           </div>
         </div>
       </form>
 
       <!-- Results Section -->
-      @if (hasSearched) {
+      @if (hasSearched()) {
         <div class="results-section">
           <div class="results-header">
             <h3>
-              @if (isSearching) {
+              @if (isSearching()) {
                 <span>Searching...</span>
               } @else {
-                <span>Results: {{ filteredResults.length }} customer(s) found</span>
+                <span>Results: {{ filteredResults().length }} customer(s) found</span>
               }
             </h3>
 
-            @if (filteredResults.length > 0) {
+            @if (filteredResults().length > 0) {
               <div class="sort-controls">
                 <label for="sortBy">Sort by:</label>
                 <select id="sortBy" [(ngModel)]="sortBy" (change)="onSortChange()">
@@ -149,7 +149,7 @@
           </div>
 
           <!-- Loading State -->
-          @if (isSearching) {
+          @if (isSearching()) {
             <div class="loading-state">
               <div class="spinner"></div>
               <p>Searching customers...</p>
@@ -157,7 +157,7 @@
           }
 
           <!-- No Results -->
-          @if (!isSearching && filteredResults.length === 0) {
+          @if (!isSearching() && filteredResults().length === 0) {
             <div class="no-results">
               <p>No customers found matching your search criteria.</p>
               <p class="help">Try adjusting your search filters or clearing them to start a new search.</p>
@@ -165,9 +165,9 @@
           }
 
           <!-- Results Cards -->
-          @if (!isSearching && paginatedResults.length > 0) {
+          @if (!isSearching() && paginatedResults().length > 0) {
             <div class="results-grid">
-              @for (customer of paginatedResults; track customer.customer_id) {
+              @for (customer of paginatedResults(); track customer.customer_id) {
                 <div class="customer-card">
                   <div class="card-photo">
                     <img [src]="getPhotoUrl(customer.profile_photo)" [alt]="customer.first_name + ' ' + customer.last_name" />
@@ -210,13 +210,13 @@
             </div>
 
             <!-- Pagination -->
-            @if (totalPages > 1) {
+            @if (totalPages() > 1) {
               <div class="pagination">
                 <button
                   type="button"
                   class="btn btn-outline btn-small"
                   (click)="prevPage()"
-                  [disabled]="currentPage === 1">
+                  [disabled]="currentPage() === 1">
                   ← Previous
                 </button>
 
@@ -225,7 +225,7 @@
                     <button
                       type="button"
                       class="page-btn"
-                      [class.active]="page === currentPage"
+                      [class.active]="page === currentPage()"
                       (click)="goToPage(page)">
                       {{ page }}
                     </button>
@@ -236,15 +236,15 @@
                   type="button"
                   class="btn btn-outline btn-small"
                   (click)="nextPage()"
-                  [disabled]="currentPage === totalPages">
+                  [disabled]="currentPage() === totalPages()">
                   Next →
                 </button>
               </div>
 
               <div class="pagination-info">
-                Showing {{ (currentPage - 1) * itemsPerPage + 1 }} -
-                {{ currentPage * itemsPerPage > filteredResults.length ? filteredResults.length : currentPage * itemsPerPage }}
-                of {{ filteredResults.length }} results
+                Showing {{ (currentPage() - 1) * itemsPerPage + 1 }} -
+                {{ currentPage() * itemsPerPage > filteredResults().length ? filteredResults().length : currentPage() * itemsPerPage }}
+                of {{ filteredResults().length }} results
               </div>
             }
           }

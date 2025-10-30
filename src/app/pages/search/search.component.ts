@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -62,18 +62,18 @@ export class SearchComponent implements OnInit {
     visitTypeId: ''
   };
 
-  // Results
-  searchResults: CustomerResult[] = [];
-  filteredResults: CustomerResult[] = [];
-  isSearching = false;
-  hasSearched = false;
-  searchError: string | null = null;
+  // Results - using signals for reactive updates
+  searchResults = signal<CustomerResult[]>([]);
+  filteredResults = signal<CustomerResult[]>([]);
+  isSearching = signal(false);
+  hasSearched = signal(false);
+  searchError = signal<string | null>(null);
 
-  // Pagination
-  currentPage = 1;
+  // Pagination - using signals
+  currentPage = signal(1);
   itemsPerPage = 10;
-  totalPages = 1;
-  paginatedResults: CustomerResult[] = [];
+  totalPages = signal(1);
+  paginatedResults = signal<CustomerResult[]>([]);
 
   // Sorting
   sortBy: 'name' | 'last_visit' | 'next_appointment' = 'name';
@@ -129,14 +129,14 @@ export class SearchComponent implements OnInit {
     if (!this.filters.firstName && !this.filters.lastName && !this.filters.phone &&
         !this.filters.dateFrom && !this.filters.dateTo && !this.filters.serviceId && !this.filters.visitTypeId) {
       console.log('❌ Validation failed: No search criteria provided');
-      this.searchError = 'Please enter at least one search criteria';
+      this.searchError.set('Please enter at least one search criteria');
       return;
     }
 
     console.log('✅ Validation passed');
-    this.isSearching = true;
-    this.searchError = null;
-    this.hasSearched = true;
+    this.isSearching.set(true);
+    this.searchError.set(null);
+    this.hasSearched.set(true);
     console.log('🔄 isSearching set to TRUE');
 
     // Build query parameters
@@ -159,22 +159,22 @@ export class SearchComponent implements OnInit {
     this.http.get<any>(fullUrl).subscribe({
       next: (response) => {
         console.log('📥 API Response received:', response);
-        this.isSearching = false;
+        this.isSearching.set(false);
         console.log('🔄 isSearching set to FALSE');
 
         if (response.success) {
           console.log('✅ Success! Found', response.data?.length || 0, 'results');
-          this.searchResults = response.data || [];
-          this.filteredResults = [...this.searchResults];
-          console.log('📊 Results stored:', this.searchResults);
+          this.searchResults.set(response.data || []);
+          this.filteredResults.set([...response.data || []]);
+          console.log('📊 Results stored:', this.searchResults());
           this.applySorting();
           this.updatePagination();
           console.log('✅ Search completed successfully');
         } else {
           console.log('❌ API returned failure:', response.message);
-          this.searchError = response.message || 'Search failed';
-          this.searchResults = [];
-          this.filteredResults = [];
+          this.searchError.set(response.message || 'Search failed');
+          this.searchResults.set([]);
+          this.filteredResults.set([]);
           this.updatePagination();
         }
       },
@@ -187,11 +187,11 @@ export class SearchComponent implements OnInit {
           url: error.url,
           error: error.error
         });
-        this.isSearching = false;
+        this.isSearching.set(false);
         console.log('🔄 isSearching set to FALSE (error)');
-        this.searchError = 'Error connecting to server. Please try again.';
-        this.searchResults = [];
-        this.filteredResults = [];
+        this.searchError.set('Error connecting to server. Please try again.');
+        this.searchResults.set([]);
+        this.filteredResults.set([]);
         this.updatePagination();
       }
     });
@@ -209,22 +209,22 @@ export class SearchComponent implements OnInit {
       serviceId: '',
       visitTypeId: ''
     };
-    this.searchResults = [];
-    this.filteredResults = [];
-    this.hasSearched = false;
-    this.searchError = null;
-    this.currentPage = 1;
+    this.searchResults.set([]);
+    this.filteredResults.set([]);
+    this.hasSearched.set(false);
+    this.searchError.set(null);
+    this.currentPage.set(1);
     this.updatePagination();
   }
 
   onSortChange() {
     this.applySorting();
-    this.currentPage = 1;
+    this.currentPage.set(1);
     this.updatePagination();
   }
 
   applySorting() {
-    this.filteredResults.sort((a, b) => {
+    const sorted = [...this.filteredResults()].sort((a, b) => {
       let comparison = 0;
 
       switch (this.sortBy) {
@@ -247,39 +247,43 @@ export class SearchComponent implements OnInit {
 
       return this.sortOrder === 'asc' ? comparison : -comparison;
     });
+    this.filteredResults.set(sorted);
   }
 
   updatePagination() {
-    this.totalPages = Math.ceil(this.filteredResults.length / this.itemsPerPage);
-    if (this.totalPages === 0) this.totalPages = 1;
-    if (this.currentPage > this.totalPages) this.currentPage = this.totalPages;
+    const total = Math.ceil(this.filteredResults().length / this.itemsPerPage);
+    this.totalPages.set(total === 0 ? 1 : total);
 
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    if (this.currentPage() > this.totalPages()) {
+      this.currentPage.set(this.totalPages());
+    }
+
+    const startIndex = (this.currentPage() - 1) * this.itemsPerPage;
     const endIndex = startIndex + this.itemsPerPage;
-    this.paginatedResults = this.filteredResults.slice(startIndex, endIndex);
+    this.paginatedResults.set(this.filteredResults().slice(startIndex, endIndex));
   }
 
   goToPage(page: number) {
-    if (page >= 1 && page <= this.totalPages) {
-      this.currentPage = page;
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
       this.updatePagination();
     }
   }
 
   nextPage() {
-    this.goToPage(this.currentPage + 1);
+    this.goToPage(this.currentPage() + 1);
   }
 
   prevPage() {
-    this.goToPage(this.currentPage - 1);
+    this.goToPage(this.currentPage() - 1);
   }
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
     const maxVisible = 5;
 
-    let startPage = Math.max(1, this.currentPage - 2);
-    let endPage = Math.min(this.totalPages, startPage + maxVisible - 1);
+    let startPage = Math.max(1, this.currentPage() - 2);
+    let endPage = Math.min(this.totalPages(), startPage + maxVisible - 1);
 
     if (endPage - startPage < maxVisible - 1) {
       startPage = Math.max(1, endPage - maxVisible + 1);
