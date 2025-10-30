@@ -4,7 +4,7 @@
     <h1 style="margin:0;font-size:18px">Salon Customer Manager</h1>
   </div>
   <nav class="nav">
-    <a routerLink="/" routerLinkActive="active">Register</a> <!-- Remove routerLinkActiveOptions -->
+    <a routerLink="/" [class.active]="isRegisterActive()">Register</a>
     <a routerLink="/search" routerLinkActive="active">Search</a>
     <a routerLink="/scan" routerLinkActive="active">QR Scanner</a>
   </nav>

@@ -57,7 +57,8 @@
             <div class="field">
               <label for="phone" class="req">Phone</label>
               <input id="phone" type="tel" [(ngModel)]="customer.phone" name="phone"
-                     placeholder="(555) 123‑4567"
+                     placeholder="(555) 123-4567"
+                     (input)="formatPhoneNumber($event)"
                      (blur)="validateField('phone', customer.phone)"
                      [class.error]="fieldErrors['phone']"
                      [class.flash-error]="isFlashing('phone')" />
@@ -117,11 +118,12 @@
                     [class.error]="fieldErrors['service']"
                     [class.flash-error]="isFlashing('service')">
               <option value="" selected disabled>Select a service…</option>
-              <option>Threading</option>
-              <option>Waxing</option>
-              <option>Tinting</option>
-              <option>Lashes</option>
               <option>Facial</option>
+              <option>Lashes</option>
+              <option>Threading</option>
+              <option>Tinting</option>
+              <option>Waxing</option>
+              <option>Other</option>
             </select>
             @if (fieldErrors['service']) {
               <div class="error-message">
@@ -132,7 +134,7 @@
 
           <div class="field">
             <label for="notes">Notes</label>
-            <textarea id="notes" [(ngModel)]="customer.notes" name="notes" 
+            <textarea id="notes" [(ngModel)]="customer.notes" name="notes"
                       placeholder="Allergies, preferences, reference look, etc."
                       [class.error]="fieldErrors['notes']"
                       [class.flash-error]="isFlashing('notes')"></textarea>
@@ -142,6 +144,27 @@
                 <span class="error-message"> - {{ fieldErrors['notes'] }}</span>
               }
             </div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div class="field">
+            <label>Customer QR Code</label>
+            @if (qrCodeDataUrl) {
+              <div style="text-align: center; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <img [src]="qrCodeDataUrl" alt="Customer QR Code" style="max-width: 300px; width: 100%;" />
+                <div class="help" style="margin-top: 10px; color: #666;">
+                  Scan this code to access customer information
+                </div>
+              </div>
+            } @else if (qrCodeError) {
+              <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
+                {{ qrCodeError }}
+              </div>
+            } @else {
+              <div style="padding: 15px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; color: #666;">
+                QR code will be generated after customer data is loaded or saved
+              </div>
+            }
           </div>
         </div>
 
@@ -233,6 +256,7 @@
             <div class="field">
               <label for="date" class="req">Date</label>
               <input id="date" type="date" [(ngModel)]="customer.date" name="date"
+                     [min]="minDate"
                      (blur)="validateField('date', customer.date)"
                      [class.error]="fieldErrors['date']"
                      [class.flash-error]="isFlashing('date')" />

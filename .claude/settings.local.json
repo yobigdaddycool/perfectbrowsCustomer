@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(bash -c \"ps aux | grep -E ''npm|node'' | grep -v grep\")",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

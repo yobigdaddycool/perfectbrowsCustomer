@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
+import * as QRCode from 'qrcode';
 
 @Component({
   selector: 'app-register',
@@ -55,8 +56,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
   photoFileName: string | null = null;
   shouldDeletePhoto = false; // Flag to track if photo should be deleted on update
 
+  // QR Code properties
+  qrCodeDataUrl: string | null = null;
+  qrCodeError: string | null = null;
+
   // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
+
+  // Minimum allowed date (yesterday)
+  minDate: string = '';
 
   constructor(
     private http: HttpClient,
@@ -76,6 +84,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     console.log('🚀 RegisterComponent initialized');
+
+    // Set minimum date to yesterday (one day in the past)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    this.minDate = yesterday.toISOString().split('T')[0];
+    console.log('📅 Minimum allowed date set to:', this.minDate);
 
     // Check if we're in edit mode by looking for an ID in the route
     this.route.params.subscribe(params => {
@@ -201,6 +215,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Store original form data after loading
     this.storeOriginalFormData();
+
+    // Generate QR code for this customer
+    this.generateQRCode();
   }
 
   // Store original form data to compare later
@@ -223,7 +240,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('🔍 Form dirty check:', this.isFormDirty);
   }
 
-  onSubmit() {
+  async onSubmit() {
     this.fieldErrors = {};
     const errors = this.validateForm();
 
@@ -234,6 +251,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Check for duplicate phone numbers (unless it's all ones or in edit mode)
+    if (!this.isEditMode && !this.isAllOnesPhone(this.customer.phone)) {
+      const isDuplicate = await this.checkDuplicatePhone(this.customer.phone);
+      if (isDuplicate) {
+        this.fieldErrors['phone'] = 'This phone number is already registered';
+        this.showToastMessage('Phone number already exists. Please use a different number.');
+        this.triggerFlashAnimation(['phone']);
+        return;
+      }
+    }
+
     if (this.isEditMode && this.customerId) {
       this.updateCustomer();
     } else {
@@ -242,9 +270,71 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   createCustomer() {
-    // TODO: Implement API call to create customer
-    console.log('Creating new customer:', this.customer);
-    this.showToastMessage('Customer saved successfully!');
+    console.log('💾 Creating new customer:', this.customer);
+    console.log('📸 Captured photo exists?', !!this.capturedPhoto);
+
+    // Prepare data for API
+    const createData: any = {
+      firstName: this.customer.firstName,
+      lastName: this.customer.lastName,
+      phone: this.customer.phone,
+      email: this.customer.email,
+      smsConsent: this.customer.smsConsent ? 1 : 0,
+      emailConsent: this.customer.emailConsent ? 1 : 0,
+      // Appointment data
+      date: this.customer.date,
+      time: this.customer.time,
+      stylist: this.customer.stylist,
+      service: this.customer.service,
+      visitType: this.customer.visitType,
+      notes: this.customer.notes,
+      price: this.customer.price
+    };
+
+    // Include photo if captured
+    if (this.capturedPhoto && this.capturedPhoto.startsWith('data:image')) {
+      createData.photo = this.capturedPhoto;
+      console.log('📸 Including photo in create request');
+    }
+
+    const url = `${this.apiUrl}?action=create-customer`;
+    console.log('📡 Sending create request to:', url);
+
+    // Show loading state
+    this.isLoadingCustomer = true;
+
+    this.http.post<any>(url, createData).subscribe({
+      next: (response) => {
+        console.log('✅ Create response:', response);
+        this.isLoadingCustomer = false;
+
+        if (response.success) {
+          const customerId = response.data?.customerId;
+          console.log('✅ Customer created with ID:', customerId);
+
+          // Generate QR code for the new customer
+          if (customerId) {
+            this.customerId = customerId;
+            this.generateQRCode();
+          }
+
+          this.showToastMessage('Customer Saved Successfully!');
+
+          // Clear the form after successful save
+          setTimeout(() => {
+            this.onClear();
+          }, 2000);
+        } else {
+          this.showToastMessage('Failed to create customer: ' + response.message);
+          console.error('❌ Create failed:', response.message);
+        }
+      },
+      error: (error) => {
+        console.error('❌ HTTP Error creating customer:', error);
+        this.isLoadingCustomer = false;
+        this.showToastMessage('Error creating customer. Please try again.');
+      }
+    });
   }
 
   updateCustomer() {
@@ -339,6 +429,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
 
+          // Generate QR code after successful update
+          this.generateQRCode();
+
           // Reload customer data to ensure UI is in sync with database
           if (this.isEditMode && this.customerId) {
             console.log('🔄 Reloading customer data after update...');
@@ -420,7 +513,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     if (!this.customer.date?.trim()) {
       errors['date'] = 'Date is required';
     } else if (!this.isValidDate(this.customer.date)) {
-      errors['date'] = 'Please enter a valid date';
+      errors['date'] = 'Date cannot be more than 1 day in the past';
     }
 
     if (!this.customer.stylist) {
@@ -502,7 +595,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
         if (!value?.trim()) {
           this.fieldErrors['date'] = 'Date is required';
         } else if (!this.isValidDate(value)) {
-          this.fieldErrors['date'] = 'Please enter a valid date';
+          this.fieldErrors['date'] = 'Date cannot be more than 1 day in the past';
         } else {
           delete this.fieldErrors['date'];
         }
@@ -528,11 +621,61 @@ export class RegisterComponent implements OnInit, OnDestroy {
     return phoneRegex.test(phone.replace(/\s/g, ''));
   }
 
+  private isAllOnesPhone(phone: string): boolean {
+    // Check if phone is all ones (e.g., (111) 111-1111)
+    const digitsOnly = phone.replace(/\D/g, '');
+    return digitsOnly === '1111111111';
+  }
+
+  formatPhoneNumber(event: any) {
+    // Get the input value and remove all non-numeric characters
+    let value = event.target.value.replace(/\D/g, '');
+
+    // Strictly limit to 10 digits
+    if (value.length > 10) {
+      value = value.slice(0, 10);
+    }
+
+    // Format the phone number
+    let formattedValue = '';
+    if (value.length > 0) {
+      formattedValue = '(' + value.substring(0, 3);
+      if (value.length >= 4) {
+        formattedValue += ') ' + value.substring(3, 6);
+      }
+      if (value.length >= 7) {
+        formattedValue += '-' + value.substring(6, 10);
+      }
+    }
+
+    // Update the model and input field with formatted value
+    this.customer.phone = formattedValue || value;
+
+    // Force update the input field to prevent extra characters
+    event.target.value = this.customer.phone;
+
+    // Trigger change detection
+    this.checkFormDirty();
+  }
+
   private isValidDate(date: string): boolean {
-    const selectedDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return selectedDate >= today;
+    const selectedDate = new Date(date + 'T00:00:00'); // Force midnight local time
+    selectedDate.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1); // One day in the past
+    yesterday.setHours(0, 0, 0, 0);
+
+    console.log('📅 Validating date:', date);
+    console.log('📅 Selected date (normalized):', selectedDate.toISOString());
+    console.log('📅 Yesterday (normalized):', yesterday.toISOString());
+    console.log('📅 Is valid?', selectedDate >= yesterday);
+
+    if (selectedDate < yesterday) {
+      console.log('❌ Date validation failed: Date is more than 1 day in the past');
+      return false;
+    }
+    return true;
   }
 
   private isValidPrice(price: any): boolean {
@@ -709,6 +852,69 @@ hideToast() {
         this.checkFormDirty(); // Mark form as dirty when photo changes
       };
       reader.readAsDataURL(file);
+    }
+  }
+
+  // Phone Duplicate Check
+
+  async checkDuplicatePhone(phone: string): Promise<boolean> {
+    try {
+      const digitsOnly = phone.replace(/\D/g, '');
+      const url = `${this.apiUrl}?action=check-duplicate-phone&phone=${encodeURIComponent(digitsOnly)}`;
+
+      console.log('🔍 Checking for duplicate phone:', digitsOnly);
+
+      const response = await this.http.get<any>(url).toPromise();
+
+      if (response && response.exists) {
+        console.log('❌ Phone number already exists');
+        return true;
+      }
+
+      console.log('✅ Phone number is unique');
+      return false;
+    } catch (error) {
+      console.error('❌ Error checking duplicate phone:', error);
+      // On error, allow the submission to proceed (fail open)
+      return false;
+    }
+  }
+
+  // QR Code Methods
+
+  async generateQRCode() {
+    try {
+      console.log('🔲 Generating QR code for customer...');
+
+      // Create QR code data with customer information
+      const qrData = {
+        customerId: this.customerId || 'NEW',
+        firstName: this.customer.firstName,
+        lastName: this.customer.lastName,
+        phone: this.customer.phone,
+        email: this.customer.email
+      };
+
+      const qrString = JSON.stringify(qrData);
+      console.log('🔲 QR code data:', qrString);
+
+      // Generate QR code as data URL
+      this.qrCodeDataUrl = await QRCode.toDataURL(qrString, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      console.log('✅ QR code generated successfully');
+      this.qrCodeError = null;
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('❌ Error generating QR code:', error);
+      this.qrCodeError = 'Failed to generate QR code';
+      this.qrCodeDataUrl = null;
     }
   }
 }

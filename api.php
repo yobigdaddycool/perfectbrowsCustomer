@@ -81,11 +81,20 @@ try {
         case 'update-customer':
             updateCustomer($response);
             break;
+        case 'create-customer':
+            createCustomer($response);
+            break;
+        case 'scan-qr':
+            scanQRCode($response);
+            break;
+        case 'check-duplicate-phone':
+            checkDuplicatePhone($response);
+            break;
         default:
             $response['success'] = false;
             $response['message'] = 'No action specified';
-            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer';
-            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer";
+            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone';
+            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone";
             break;
     }
     
@@ -691,6 +700,255 @@ function updateCustomer(&$response) {
     } catch (Exception $e) {
         $response['success'] = false;
         $response['message'] = "Failed to update customer";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ Exception: " . $e->getMessage();
+    }
+}
+
+function checkDuplicatePhone(&$response) {
+    global $pdo;
+
+    try {
+        $phone = $_GET['phone'] ?? '';
+
+        if (empty($phone)) {
+            $response['success'] = false;
+            $response['message'] = "Phone number is required";
+            $response['error'] = "Missing phone parameter";
+            return;
+        }
+
+        // Clean the phone number (remove all non-numeric characters)
+        $cleanPhone = preg_replace('/\D/', '', $phone);
+
+        $response['debug'][] = "Checking for duplicate phone: $cleanPhone";
+
+        // Check if phone is all ones (1111111111) - this is allowed to be duplicated
+        if ($cleanPhone === '1111111111') {
+            $response['success'] = true;
+            $response['message'] = "All-ones phone number is allowed (for testing/opt-out)";
+            $response['exists'] = false; // Allow duplicate
+            $response['debug'][] = "Phone is all ones - allowing duplicate";
+            return;
+        }
+
+        // Check if phone already exists in database
+        $sql = "SELECT customer_id, first_name, last_name
+                FROM customers
+                WHERE REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', '') = :phone
+                LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':phone' => $cleanPhone]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $response['success'] = true;
+            $response['message'] = "Phone number already exists";
+            $response['exists'] = true;
+            $response['data'] = $existing;
+            $response['debug'][] = "Phone found for customer: " . $existing['first_name'] . " " . $existing['last_name'];
+        } else {
+            $response['success'] = true;
+            $response['message'] = "Phone number is unique";
+            $response['exists'] = false;
+            $response['debug'][] = "Phone number is available";
+        }
+
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to check phone number";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    }
+}
+
+function createCustomer(&$response) {
+    global $pdo;
+
+    try {
+        // Get POST data (expecting JSON)
+        $json = file_get_contents('php://input');
+        $data = json_decode($json, true);
+
+        if (!$data) {
+            $response['success'] = false;
+            $response['message'] = "Invalid JSON data";
+            $response['error'] = "Failed to parse JSON";
+            return;
+        }
+
+        $firstName = $data['firstName'] ?? '';
+        $lastName = $data['lastName'] ?? '';
+        $phone = $data['phone'] ?? '';
+        $email = $data['email'] ?? '';
+        $smsConsent = isset($data['smsConsent']) ? (int)$data['smsConsent'] : 0;
+        $emailConsent = isset($data['emailConsent']) ? (int)$data['emailConsent'] : 0;
+        $photo = $data['photo'] ?? null;
+
+        // Appointment data
+        $appointmentDate = $data['date'] ?? null;
+        $appointmentTime = $data['time'] ?? null;
+        $stylistId = $data['stylist'] ?? null;
+        $serviceId = $data['service'] ?? null;
+        $visitType = $data['visitType'] ?? null;
+        $notes = $data['notes'] ?? '';
+        $quotedPrice = $data['price'] ?? null;
+
+        $response['debug'][] = "Creating new customer: $firstName $lastName";
+
+        // Validate required fields
+        if (empty($firstName) || empty($lastName) || empty($phone)) {
+            $response['success'] = false;
+            $response['message'] = "Missing required fields";
+            $response['error'] = "firstName, lastName, and phone are required";
+            return;
+        }
+
+        // Insert customer
+        $insertCustomerSql = "INSERT INTO customers
+            (first_name, last_name, phone, email, sms_consent, email_consent, created_at, updated_at)
+            VALUES (:firstName, :lastName, :phone, :email, :smsConsent, :emailConsent, NOW(), NOW())";
+
+        $stmt = $pdo->prepare($insertCustomerSql);
+        $stmt->execute([
+            ':firstName' => $firstName,
+            ':lastName' => $lastName,
+            ':phone' => $phone,
+            ':email' => $email,
+            ':smsConsent' => $smsConsent,
+            ':emailConsent' => $emailConsent
+        ]);
+
+        $customerId = $pdo->lastInsertId();
+        $response['debug'][] = "✅ Customer created with ID: $customerId";
+
+        // Create appointment if date provided
+        if (!empty($appointmentDate)) {
+            $response['debug'][] = "📅 Creating appointment...";
+
+            // Convert stylist name to ID
+            $stylistIdResolved = null;
+            if (!empty($stylistId) && !is_numeric($stylistId)) {
+                $getStylistSql = "SELECT stylist_id FROM stylists WHERE first_name = :stylistName";
+                $stmt = $pdo->prepare($getStylistSql);
+                $stmt->execute([':stylistName' => $stylistId]);
+                $stylistRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($stylistRow) {
+                    $stylistIdResolved = $stylistRow['stylist_id'];
+                }
+            } else {
+                $stylistIdResolved = $stylistId;
+            }
+
+            // Convert service name to ID
+            $serviceIdResolved = null;
+            if (!empty($serviceId) && !is_numeric($serviceId)) {
+                $getServiceSql = "SELECT service_id FROM services WHERE service_name = :serviceName";
+                $stmt = $pdo->prepare($getServiceSql);
+                $stmt->execute([':serviceName' => $serviceId]);
+                $serviceRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($serviceRow) {
+                    $serviceIdResolved = $serviceRow['service_id'];
+                }
+            } else {
+                $serviceIdResolved = $serviceId;
+            }
+
+            // Get visit type ID
+            $visitTypeId = null;
+            if (!empty($visitType)) {
+                $getVisitTypeSql = "SELECT visit_type_id FROM visit_types WHERE type_name = :typeName";
+                $stmt = $pdo->prepare($getVisitTypeSql);
+                $stmt->execute([':typeName' => $visitType]);
+                $visitTypeRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($visitTypeRow) {
+                    $visitTypeId = $visitTypeRow['visit_type_id'];
+                }
+            }
+
+            // Insert appointment
+            $insertAppointmentSql = "INSERT INTO appointments
+                (customer_id, appointment_date, appointment_time, stylist_id, service_id, visit_type_id, notes, quoted_price)
+                VALUES (:customerId, :appointmentDate, :appointmentTime, :stylistId, :serviceId, :visitTypeId, :notes, :quotedPrice)";
+
+            $stmt = $pdo->prepare($insertAppointmentSql);
+            $stmt->execute([
+                ':customerId' => $customerId,
+                ':appointmentDate' => $appointmentDate,
+                ':appointmentTime' => $appointmentTime ?: null,
+                ':stylistId' => $stylistIdResolved,
+                ':serviceId' => $serviceIdResolved,
+                ':visitTypeId' => $visitTypeId,
+                ':notes' => $notes,
+                ':quotedPrice' => $quotedPrice ?: null
+            ]);
+
+            $response['debug'][] = "✅ Appointment created";
+        }
+
+        // Handle photo upload if provided
+        $photoPath = null;
+        if (!empty($photo)) {
+            $response['debug'][] = "📸 Processing photo upload...";
+
+            // Remove data:image/jpeg;base64, prefix if present
+            if (strpos($photo, 'data:image') === 0) {
+                $photo = substr($photo, strpos($photo, ',') + 1);
+            }
+
+            // Decode base64
+            $photoData = base64_decode($photo);
+
+            if ($photoData !== false) {
+                // Create directory if it doesn't exist
+                $uploadDir = __DIR__ . '/tempdata/customer_photos';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+
+                // Generate filename
+                $timestamp = time();
+                $fileName = "customer_{$customerId}_{$timestamp}_profile.jpg";
+                $filePath = $uploadDir . '/' . $fileName;
+                $relativePath = "tempdata/customer_photos/" . $fileName;
+
+                // Save file
+                if (file_put_contents($filePath, $photoData) !== false) {
+                    $photoPath = $relativePath;
+
+                    // Insert photo record
+                    $insertPhotoSql = "INSERT INTO customer_photos
+                        (customer_id, file_name, file_path, photo_type, is_primary, uploaded_at)
+                        VALUES (:customerId, :fileName, :filePath, 'profile', 1, NOW())";
+
+                    $stmt = $pdo->prepare($insertPhotoSql);
+                    $stmt->execute([
+                        ':customerId' => $customerId,
+                        ':fileName' => $fileName,
+                        ':filePath' => $relativePath
+                    ]);
+
+                    $response['debug'][] = "✅ Photo saved: $relativePath";
+                }
+            }
+        }
+
+        $response['success'] = true;
+        $response['message'] = "Customer created successfully";
+        $response['data'] = [
+            'customerId' => $customerId,
+            'photoPath' => $photoPath
+        ];
+
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to create customer";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    } catch (Exception $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to create customer";
         $response['error'] = $e->getMessage();
         $response['debug'][] = "❌ Exception: " . $e->getMessage();
     }
