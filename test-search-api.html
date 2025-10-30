@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Search API</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px 0; background: #d946ef; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+        pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto; }
+        .loading { color: #d946ef; }
+        .error { color: #dc2626; }
+        .success { color: #059669; }
+    </style>
+</head>
+<body>
+    <h1>Test Search API</h1>
+
+    <h2>Test 1: Connection Test</h2>
+    <button onclick="testConnection()">Test Database Connection</button>
+    <div id="connection-result"></div>
+
+    <h2>Test 2: Get Services</h2>
+    <button onclick="getServices()">Get Services</button>
+    <div id="services-result"></div>
+
+    <h2>Test 3: Search Customers</h2>
+    <button onclick="searchCustomers()">Search for "TestFirstName01"</button>
+    <div id="search-result"></div>
+
+    <script>
+        const API_URL = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
+
+        async function testConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = '<p class="loading">Testing connection...</p>';
+
+            try {
+                const response = await fetch(`${API_URL}?action=test-connection&t=${Date.now()}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `<p class="success">✅ Connection successful!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Connection failed</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+
+        async function getServices() {
+            const resultDiv = document.getElementById('services-result');
+            resultDiv.innerHTML = '<p class="loading">Getting services...</p>';
+
+            try {
+                const response = await fetch(`${API_URL}?action=get-services&t=${Date.now()}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `<p class="success">✅ Found ${data.data.length} services</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Failed</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+
+        async function searchCustomers() {
+            const resultDiv = document.getElementById('search-result');
+            resultDiv.innerHTML = '<p class="loading">Searching customers...</p>';
+
+            try {
+                const params = new URLSearchParams();
+                params.append('action', 'search-customers');
+                params.append('firstName', 'TestFirstName01');
+
+                const url = `${API_URL}?${params.toString()}&t=${Date.now()}`;
+                console.log('Calling:', url);
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                console.log('Response:', data);
+
+                if (data.success) {
+                    resultDiv.innerHTML = `<p class="success">✅ Found ${data.data.length} customer(s)</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Search failed</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Error details:', error);
+            }
+        }
+    </script>
+</body>
+</html>

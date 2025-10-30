@@ -67,12 +67,24 @@ Get-ChildItem -Force .deploy_publish | ? { $_.Name -ne ".git" } | Remove-Item -R
 Copy-Item -Path dist\*\browser\* -Destination .deploy_publish -Recurse -Force
 
 # --- include extra files ---
-# 1) if they exist at repo root (old location)
+# 1) Copy backend API files from root directory
+Write-Host "Copying backend files..."
+$backendFiles = @("api.php", "db-config.php", "test-db-connection.php")
+foreach ($file in $backendFiles) {
+  if (Test-Path $file) {
+    Copy-Item -Path $file -Destination .deploy_publish -Force
+    Write-Host "  [OK] Copied $file"
+  } else {
+    Write-Host "  [WARN] $file not found"
+  }
+}
+
+# 2) Copy test-db-connection files if they exist at repo root (old location)
 Get-ChildItem -File -Path test-db-connection.* -ErrorAction SilentlyContinue | % {
   Copy-Item -Path $_.FullName -Destination .deploy_publish -Force
 }
 
-# 2) NEW location under src/... -> copy to DEPLOY ROOT
+# 3) NEW location under src/... -> copy to DEPLOY ROOT
 $extraMap = @{
   "src\app\pages\testing-db\test-db-connection.php" = "test-db-connection.php"
   "src\app\pages\testing-db\test-db-connection.js"  = "test-db-connection.js"
