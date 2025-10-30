@@ -5,13 +5,10 @@ $sshKeyPassphrase = "Perfect123!"
 
 Write-Host "Setting up SSH agent..."
 
-# Create SSH_ASKPASS script that returns the password
-$askpassScript = @"
-#!/bin/sh
-echo '$sshKeyPassphrase'
-"@
-$askpassPath = "$PSScriptRoot\_ssh_askpass.sh"
-$askpassScript | Out-File -FilePath $askpassPath -Encoding ASCII -Force
+# Clear any existing SSH_ASKPASS that might interfere
+$env:SSH_ASKPASS = $null
+$env:SSH_ASKPASS_REQUIRE = $null
+$env:DISPLAY = $null
 
 # Start ssh-agent and capture output
 $agentOutput = & "C:\Program Files\Git\usr\bin\ssh-agent.exe" 2>&1 | Out-String
@@ -28,25 +25,26 @@ Write-Host "Adding SSH key..."
 
 # Convert Windows path to Unix path for bash
 $sshAuthSockUnix = $env:SSH_AUTH_SOCK -replace '\\', '/' -replace '^([A-Z]):', '/mnt/$1'.ToLower()
-$askpassUnix = ($askpassPath -replace '\\', '/' -replace '^([A-Z]):', '/$1').ToLower() -replace '^/([a-z])/', '/mnt/$1/'
 
-# Use SSH_ASKPASS with setsid to run ssh-add without terminal
+# Use expect-style approach with bash heredoc to provide password non-interactively
 $bashCommand = @"
 export SSH_AUTH_SOCK='$sshAuthSockUnix'
 export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'
-export SSH_ASKPASS='$askpassUnix'
-export SSH_ASKPASS_REQUIRE=force
-export DISPLAY=:0
-chmod +x '$askpassUnix'
-setsid ssh-add ~/.ssh/id_rsa </dev/null >/dev/null 2>&1
+export SSH_ASKPASS_REQUIRE=never
+cat <<EOF | ssh-add ~/.ssh/id_rsa
+$sshKeyPassphrase
+EOF
 "@
 
 $output = & "C:\Program Files\Git\bin\bash.exe" -c $bashCommand 2>&1
+if ($output) {
+    Write-Host "Result: $output"
+}
 
 # Verify key was added
 $verifyCommand = "export SSH_AUTH_SOCK='$sshAuthSockUnix'; ssh-add -l"
 $keyList = & "C:\Program Files\Git\bin\bash.exe" -c $verifyCommand 2>&1
-Write-Host "Key added successfully!"
+Write-Host "Keys loaded: $(if ($keyList -match 'SHA256') { '1 key(s)' } else { 'No keys' })"
 
 Start-Sleep -Seconds 1
 
@@ -94,11 +92,10 @@ cd ..
 git worktree remove .deploy_publish -f 2>$null
 
 # ============================================
-# Cleanup: Stop ssh-agent and remove helper
+# Cleanup: Stop ssh-agent
 # ============================================
 Write-Host "Cleaning up..."
 if ($env:SSH_AGENT_PID) {
     & "C:\Program Files\Git\usr\bin\ssh-agent.exe" -k 2>&1 | Out-Null
 }
-Remove-Item -Path "$PSScriptRoot\_ssh_askpass.sh" -Force -ErrorAction SilentlyContinue
 Write-Host "Deployment complete!"
