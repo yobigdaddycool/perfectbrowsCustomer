@@ -1,18 +1,29 @@
 # ============================================
-# Setup Git credentials for automation
+# Setup SSH key passphrase automation
 # ============================================
-$env:GIT_ASKPASS = "$PSScriptRoot\_git_askpass.ps1"
-$env:GIT_USERNAME = "bigda"
-$env:GIT_PASSWORD = "Perfect123!"
+$sshKeyPassphrase = "Perfect123!"
 
-# Create temporary askpass helper script
-@"
-if (`$args[0] -match 'Username') {
-  Write-Output `$env:GIT_USERNAME
-} else {
-  Write-Output `$env:GIT_PASSWORD
+# Check if ssh-agent is already running
+$agentRunning = Get-Process ssh-agent -ErrorAction SilentlyContinue
+if (-not $agentRunning) {
+    Write-Host "Starting ssh-agent..."
+    Start-Service ssh-agent -ErrorAction SilentlyContinue
+    # If service doesn't exist, start manually
+    if (-not (Get-Service ssh-agent -ErrorAction SilentlyContinue)) {
+        Start-Process ssh-agent -WindowStyle Hidden
+        Start-Sleep -Seconds 2
+    }
 }
-"@ | Out-File -FilePath "$PSScriptRoot\_git_askpass.ps1" -Encoding ASCII -Force
+
+# Create a simple batch file to pass the passphrase
+$batchPath = "$PSScriptRoot\_add_key.bat"
+@"
+@echo off
+echo $sshKeyPassphrase| ssh-add "$env:USERPROFILE\.ssh\id_rsa"
+"@ | Out-File -FilePath $batchPath -Encoding ASCII -Force
+
+Write-Host "Adding SSH key..."
+& cmd /c $batchPath 2>&1 | Out-Null
 
 # push MAIN
 git add -A
@@ -58,6 +69,8 @@ cd ..
 git worktree remove .deploy_publish -f 2>$null
 
 # ============================================
-# Cleanup: Remove temporary askpass helper
+# Cleanup: Remove helper files
 # ============================================
-Remove-Item -Path "$PSScriptRoot\_git_askpass.ps1" -Force -ErrorAction SilentlyContinue
+Write-Host "Cleaning up..."
+Remove-Item -Path "$PSScriptRoot\_add_key.bat" -Force -ErrorAction SilentlyContinue
+Write-Host "Deployment complete!"
