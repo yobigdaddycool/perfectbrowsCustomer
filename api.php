@@ -459,7 +459,17 @@ function updateCustomer(&$response) {
         $photo = $data['photo'] ?? null; // Base64 photo string
         $deletePhoto = isset($data['deletePhoto']) ? (bool)$data['deletePhoto'] : false;
 
+        // Appointment data
+        $appointmentDate = $data['date'] ?? null;
+        $appointmentTime = $data['time'] ?? null;
+        $stylistId = $data['stylist'] ?? null;
+        $serviceId = $data['service'] ?? null;
+        $visitType = $data['visitType'] ?? null;
+        $notes = $data['notes'] ?? '';
+        $quotedPrice = $data['price'] ?? null;
+
         $response['debug'][] = "Updating customer ID: $customerId";
+        $response['debug'][] = "Appointment data received: date=$appointmentDate, time=$appointmentTime, stylist=$stylistId, service=$serviceId";
         if ($deletePhoto) {
             $response['debug'][] = "Photo deletion requested";
         }
@@ -507,6 +517,86 @@ function updateCustomer(&$response) {
         ]);
 
         $response['debug'][] = "Customer information updated";
+
+        // Update appointment if data provided
+        if (!empty($appointmentDate)) {
+            $response['debug'][] = "📅 Updating appointment information...";
+
+            // Convert stylist name to ID if it's a string
+            $stylistIdResolved = $stylistId;
+            if (!empty($stylistId) && !is_numeric($stylistId)) {
+                $response['debug'][] = "Converting stylist name '$stylistId' to ID...";
+                $getStylistSql = "SELECT stylist_id FROM stylists WHERE first_name = :stylistName";
+                $stmt = $pdo->prepare($getStylistSql);
+                $stmt->execute([':stylistName' => $stylistId]);
+                $stylistRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($stylistRow) {
+                    $stylistIdResolved = $stylistRow['stylist_id'];
+                    $response['debug'][] = "Stylist '$stylistId' resolved to ID: $stylistIdResolved";
+                } else {
+                    $response['debug'][] = "⚠️ Stylist name '$stylistId' not found in database";
+                    $stylistIdResolved = null;
+                }
+            }
+
+            // Convert service name to ID if it's a string
+            $serviceIdResolved = $serviceId;
+            if (!empty($serviceId) && !is_numeric($serviceId)) {
+                $response['debug'][] = "Converting service name '$serviceId' to ID...";
+                $getServiceSql = "SELECT service_id FROM services WHERE service_name = :serviceName";
+                $stmt = $pdo->prepare($getServiceSql);
+                $stmt->execute([':serviceName' => $serviceId]);
+                $serviceRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($serviceRow) {
+                    $serviceIdResolved = $serviceRow['service_id'];
+                    $response['debug'][] = "Service '$serviceId' resolved to ID: $serviceIdResolved";
+                } else {
+                    $response['debug'][] = "⚠️ Service name '$serviceId' not found in database";
+                    $serviceIdResolved = null;
+                }
+            }
+
+            // Get the most recent appointment for this customer
+            $getAppointmentSql = "SELECT appointment_id FROM appointments
+                                  WHERE customer_id = :customerId
+                                  ORDER BY appointment_date DESC, appointment_time DESC
+                                  LIMIT 1";
+            $stmt = $pdo->prepare($getAppointmentSql);
+            $stmt->execute([':customerId' => $customerId]);
+            $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($appointment) {
+                $appointmentId = $appointment['appointment_id'];
+                $response['debug'][] = "Found appointment ID: $appointmentId";
+
+                // Update the appointment
+                $updateAppointmentSql = "UPDATE appointments SET
+                    appointment_date = :appointmentDate,
+                    appointment_time = :appointmentTime,
+                    stylist_id = :stylistId,
+                    service_id = :serviceId,
+                    notes = :notes,
+                    quoted_price = :quotedPrice
+                    WHERE appointment_id = :appointmentId";
+
+                $stmt = $pdo->prepare($updateAppointmentSql);
+                $stmt->execute([
+                    ':appointmentDate' => $appointmentDate,
+                    ':appointmentTime' => $appointmentTime ?: null,
+                    ':stylistId' => $stylistIdResolved,
+                    ':serviceId' => $serviceIdResolved,
+                    ':notes' => $notes,
+                    ':quotedPrice' => $quotedPrice ?: null,
+                    ':appointmentId' => $appointmentId
+                ]);
+
+                $response['debug'][] = "✅ Appointment updated successfully";
+            } else {
+                $response['debug'][] = "⚠️ No existing appointment found for this customer";
+            }
+        } else {
+            $response['debug'][] = "ℹ️ No appointment date provided, skipping appointment update";
+        }
 
         // Handle photo deletion if requested
         if ($deletePhoto) {
