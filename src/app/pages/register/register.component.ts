@@ -142,7 +142,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       this.customer.service = data.last_appointment.service_id || '';
       this.customer.visitType = data.last_appointment.visit_type || 'Return';
       this.customer.notes = data.last_appointment.notes || '';
-      this.customer.price = data.last_appointment.price || '';
+      this.customer.price = data.last_appointment.quoted_price || '';
 
       // Parse date/time if available
       if (data.last_appointment.appointment_datetime) {

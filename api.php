@@ -393,7 +393,7 @@ function getCustomer(&$response) {
                 a.appointment_time,
                 a.stylist_id,
                 a.service_id,
-                a.price,
+                a.quoted_price,
                 a.notes,
                 vt.type_name as visit_type,
                 s.first_name as stylist_first_name,
