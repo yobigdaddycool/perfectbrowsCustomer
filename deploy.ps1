@@ -5,6 +5,13 @@ $sshKeyPassphrase = "Perfect123!"
 
 Write-Host "Setting up SSH agent..."
 
+# Create SSH_ASKPASS helper script - must output password to stdout
+$askpassScript = @"
+Write-Output '$sshKeyPassphrase'
+"@
+$askpassPath = "$PSScriptRoot\_askpass.ps1"
+$askpassScript | Out-File -FilePath $askpassPath -Encoding ASCII -Force
+
 # Start ssh-agent and capture output
 $agentOutput = & "C:\Program Files\Git\usr\bin\ssh-agent.exe" 2>&1 | Out-String
 
@@ -16,29 +23,12 @@ if ($agentOutput -match 'SSH_AGENT_PID=(\d+)') {
     $env:SSH_AGENT_PID = $Matches[1]
 }
 
-# Create expect-style script using PowerShell
-$expectScript = @"
-`$password = '$sshKeyPassphrase'
-`$psi = New-Object System.Diagnostics.ProcessStartInfo
-`$psi.FileName = 'C:\Program Files\Git\usr\bin\ssh-add.exe'
-`$psi.Arguments = '`$env:USERPROFILE\.ssh\id_rsa'
-`$psi.UseShellExecute = `$false
-`$psi.RedirectStandardInput = `$true
-`$psi.RedirectStandardOutput = `$true
-`$psi.RedirectStandardError = `$true
-`$psi.EnvironmentVariables['SSH_AUTH_SOCK'] = '$($env:SSH_AUTH_SOCK)'
-
-`$process = [System.Diagnostics.Process]::Start(`$psi)
-`$process.StandardInput.WriteLine(`$password)
-`$process.StandardInput.Close()
-`$process.WaitForExit()
-"@
-
-$expectScriptPath = "$PSScriptRoot\_expect.ps1"
-$expectScript | Out-File -FilePath $expectScriptPath -Encoding UTF8 -Force
-
 Write-Host "Adding SSH key..."
-& powershell -File $expectScriptPath
+
+# Use Git Bash to add the key with password piped
+$bashCommand = "eval `$(ssh-agent -s) > /dev/null 2>&1; export SSH_AUTH_SOCK='$($env:SSH_AUTH_SOCK)'; export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'; echo '$sshKeyPassphrase' | ssh-add ~/.ssh/id_rsa 2>&1"
+& "C:\Program Files\Git\bin\bash.exe" -c $bashCommand | Out-Null
+
 Start-Sleep -Seconds 1
 
 # push MAIN
@@ -91,5 +81,5 @@ Write-Host "Cleaning up..."
 if ($env:SSH_AGENT_PID) {
     & "C:\Program Files\Git\usr\bin\ssh-agent.exe" -k 2>&1 | Out-Null
 }
-Remove-Item -Path "$PSScriptRoot\_expect.ps1" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$PSScriptRoot\_askpass.ps1" -Force -ErrorAction SilentlyContinue
 Write-Host "Deployment complete!"
