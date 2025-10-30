@@ -78,11 +78,14 @@ try {
         case 'get-customer':
             getCustomer($response);
             break;
+        case 'update-customer':
+            updateCustomer($response);
+            break;
         default:
             $response['success'] = false;
             $response['message'] = 'No action specified';
-            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer';
-            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer";
+            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer';
+            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer";
             break;
     }
     
@@ -428,6 +431,157 @@ function getCustomer(&$response) {
         $response['message'] = "Failed to retrieve customer";
         $response['error'] = $e->getMessage();
         $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    }
+}
+
+function updateCustomer(&$response) {
+    global $pdo;
+
+    try {
+        // Get POST data (expecting JSON)
+        $json = file_get_contents('php://input');
+        $data = json_decode($json, true);
+
+        if (!$data) {
+            $response['success'] = false;
+            $response['message'] = "Invalid JSON data";
+            $response['error'] = "Failed to parse JSON";
+            return;
+        }
+
+        $customerId = $data['customerId'] ?? '';
+        $firstName = $data['firstName'] ?? '';
+        $lastName = $data['lastName'] ?? '';
+        $phone = $data['phone'] ?? '';
+        $email = $data['email'] ?? '';
+        $smsConsent = isset($data['smsConsent']) ? (int)$data['smsConsent'] : 0;
+        $emailConsent = isset($data['emailConsent']) ? (int)$data['emailConsent'] : 0;
+        $photo = $data['photo'] ?? null; // Base64 photo string
+
+        $response['debug'][] = "Updating customer ID: $customerId";
+
+        // Validate required fields
+        if (empty($customerId) || empty($firstName) || empty($lastName) || empty($phone)) {
+            $response['success'] = false;
+            $response['message'] = "Missing required fields";
+            $response['error'] = "customerId, firstName, lastName, and phone are required";
+            return;
+        }
+
+        // Check if customer exists
+        $checkSql = "SELECT customer_id FROM customers WHERE customer_id = :customerId";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([':customerId' => $customerId]);
+
+        if (!$checkStmt->fetch()) {
+            $response['success'] = false;
+            $response['message'] = "Customer not found";
+            $response['error'] = "No customer with ID: $customerId";
+            return;
+        }
+
+        // Update customer information
+        $updateSql = "UPDATE customers SET
+            first_name = :firstName,
+            last_name = :lastName,
+            phone = :phone,
+            email = :email,
+            sms_consent = :smsConsent,
+            email_consent = :emailConsent,
+            updated_at = NOW()
+            WHERE customer_id = :customerId";
+
+        $stmt = $pdo->prepare($updateSql);
+        $stmt->execute([
+            ':firstName' => $firstName,
+            ':lastName' => $lastName,
+            ':phone' => $phone,
+            ':email' => $email,
+            ':smsConsent' => $smsConsent,
+            ':emailConsent' => $emailConsent,
+            ':customerId' => $customerId
+        ]);
+
+        $response['debug'][] = "Customer information updated";
+
+        // Handle photo upload if provided
+        $photoPath = null;
+        if (!empty($photo)) {
+            $response['debug'][] = "Processing photo upload...";
+
+            // Remove data:image/jpeg;base64, prefix if present
+            if (strpos($photo, 'data:image') === 0) {
+                $photo = substr($photo, strpos($photo, ',') + 1);
+            }
+
+            // Decode base64
+            $photoData = base64_decode($photo);
+
+            if ($photoData === false) {
+                $response['debug'][] = "⚠️ Failed to decode base64 photo";
+            } else {
+                // Create directory if it doesn't exist
+                $uploadDir = __DIR__ . '/tempdata/customer_photos';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                    $response['debug'][] = "Created directory: $uploadDir";
+                }
+
+                // Generate filename: customer_{id}_{timestamp}_profile.jpg
+                $timestamp = time();
+                $fileName = "customer_{$customerId}_{$timestamp}_profile.jpg";
+                $filePath = $uploadDir . '/' . $fileName;
+                $relativePath = "tempdata/customer_photos/" . $fileName;
+
+                // Save file
+                $saved = file_put_contents($filePath, $photoData);
+
+                if ($saved === false) {
+                    $response['debug'][] = "⚠️ Failed to save photo to filesystem";
+                } else {
+                    $response['debug'][] = "✅ Photo saved: $relativePath";
+                    $photoPath = $relativePath;
+
+                    // Update customer_photos table
+                    // First, set all existing photos for this customer as non-primary
+                    $updatePhotosSql = "UPDATE customer_photos SET is_primary = 0 WHERE customer_id = :customerId";
+                    $stmt = $pdo->prepare($updatePhotosSql);
+                    $stmt->execute([':customerId' => $customerId]);
+
+                    // Insert new photo as primary
+                    $insertPhotoSql = "INSERT INTO customer_photos
+                        (customer_id, file_name, file_path, photo_type, is_primary, uploaded_at)
+                        VALUES (:customerId, :fileName, :filePath, 'profile', 1, NOW())";
+
+                    $stmt = $pdo->prepare($insertPhotoSql);
+                    $stmt->execute([
+                        ':customerId' => $customerId,
+                        ':fileName' => $fileName,
+                        ':filePath' => $relativePath
+                    ]);
+
+                    $response['debug'][] = "✅ Photo record inserted into database";
+                }
+            }
+        }
+
+        $response['success'] = true;
+        $response['message'] = "Customer updated successfully";
+        $response['data'] = [
+            'customerId' => $customerId,
+            'photoPath' => $photoPath
+        ];
+
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to update customer";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    } catch (Exception $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to update customer";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ Exception: " . $e->getMessage();
     }
 }
 ?>
