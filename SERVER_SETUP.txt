@@ -1,0 +1,145 @@
+================================================
+BLUEHOST SERVER SETUP INSTRUCTIONS
+================================================
+
+1. CREATE PHOTO STORAGE FOLDER ON SERVER
+================================================
+
+Login to your Bluehost cPanel or use SSH/File Manager and create:
+
+Directory structure:
+/home/ichrqhmy/public_html/tempdata/customer_photos/
+
+Commands (via SSH or Terminal in cPanel):
+-----------------------------------------
+cd /home/ichrqhmy/public_html
+mkdir -p tempdata/customer_photos
+chmod 755 tempdata
+chmod 755 tempdata/customer_photos
+
+Make sure PHP can write to this folder:
+chmod 775 tempdata/customer_photos
+
+
+2. SET PROPER PERMISSIONS
+================================================
+
+The folder needs to be writable by the web server (PHP):
+
+Option A - Via SSH/Terminal:
+chmod 775 /home/ichrqhmy/public_html/tempdata/customer_photos
+
+Option B - Via cPanel File Manager:
+- Right-click on 'customer_photos' folder
+- Select 'Change Permissions'
+- Set to: 775 (Owner: Read+Write+Execute, Group: Read+Write+Execute, Public: Read+Execute)
+
+
+3. CREATE .htaccess FOR SECURITY (OPTIONAL)
+================================================
+
+To prevent direct browsing of photos folder, create:
+/home/ichrqhmy/public_html/tempdata/.htaccess
+
+Content:
+--------
+Options -Indexes
+<Files ~ "\.php$">
+  Order allow,deny
+  Deny from all
+</Files>
+
+
+4. VERIFY FOLDER EXISTS
+================================================
+
+Create a test file to verify:
+
+test-folder.php:
+----------------
+<?php
+$photoDir = __DIR__ . '/tempdata/customer_photos';
+
+if (is_dir($photoDir)) {
+    echo "✓ Folder exists: $photoDir\n";
+    if (is_writable($photoDir)) {
+        echo "✓ Folder is writable\n";
+    } else {
+        echo "✗ Folder is NOT writable\n";
+    }
+} else {
+    echo "✗ Folder does NOT exist\n";
+}
+?>
+
+Visit: https://website-2eb58030.ich.rqh.mybluehost.me/test-folder.php
+
+
+5. PHOTO NAMING CONVENTION
+================================================
+
+Photos will be saved as:
+customer_{customer_id}_{timestamp}_{photo_type}.jpg
+
+Examples:
+- customer_1_1699123456_profile.jpg
+- customer_25_1699234567_before.jpg
+- customer_25_1699234568_after.jpg
+
+
+6. FOLDER STRUCTURE SUMMARY
+================================================
+
+/home/ichrqhmy/public_html/
+├── api.php (your main API)
+├── db-config.php (database config)
+├── test-db-connection.php
+└── tempdata/
+    ├── .htaccess (security)
+    └── customer_photos/
+        ├── customer_1_1699123456_profile.jpg
+        ├── customer_2_1699234567_profile.jpg
+        └── ... (customer photos)
+
+
+7. CLEANUP OLD PHOTOS (OPTIONAL)
+================================================
+
+Create a cron job to delete photos older than X days:
+
+cleanup-old-photos.php:
+-----------------------
+<?php
+$photoDir = __DIR__ . '/tempdata/customer_photos';
+$daysOld = 365; // Keep photos for 1 year
+
+$files = glob($photoDir . '/*.{jpg,jpeg,png}', GLOB_BRACE);
+$now = time();
+
+foreach ($files as $file) {
+    if (is_file($file)) {
+        if ($now - filemtime($file) >= 60 * 60 * 24 * $daysOld) {
+            unlink($file);
+            echo "Deleted: " . basename($file) . "\n";
+        }
+    }
+}
+?>
+
+Cron job (run monthly):
+0 0 1 * * /usr/bin/php /home/ichrqhmy/public_html/cleanup-old-photos.php
+
+
+================================================
+NOTES
+================================================
+
+- All photo files are stored on server filesystem (NOT in database)
+- Database only stores file paths/names
+- Photos are served directly by web server (faster than PHP)
+- Make sure to backup this folder regularly
+- Consider setting up a CDN if you get many photos
+
+================================================
+END OF SETUP INSTRUCTIONS
+================================================

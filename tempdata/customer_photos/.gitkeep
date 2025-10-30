@@ -1,0 +1,3 @@
+# This file keeps the customer_photos directory in git
+# Photos stored here are ignored by .gitignore
+# Folder structure: tempdata/customer_photos/

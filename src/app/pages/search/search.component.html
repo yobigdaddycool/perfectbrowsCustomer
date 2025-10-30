@@ -1,2 +1,276 @@
-﻿<h2 style="margin:0 0 12px 0">Search</h2>
-<p>Placeholder - Phase 3 will add search UI.</p>
+<div class="wrap">
+  <div class="card" role="region" aria-label="Customer Search">
+    <div class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <h1>Search Customers</h1>
+      </div>
+      <div class="badges">
+        <span class="chip">Search Page</span>
+        <span class="chip">Angular App</span>
+        <span class="chip">Magenta Theme</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Search Form -->
+      <form class="search-form" (ngSubmit)="onSearch()">
+        <div class="search-section">
+          <h3>Search Criteria</h3>
+
+          <div class="grid">
+            <!-- Name Fields -->
+            <div class="col">
+              <div class="field">
+                <label for="firstName">First Name</label>
+                <input
+                  id="firstName"
+                  type="text"
+                  [(ngModel)]="filters.firstName"
+                  name="firstName"
+                  placeholder="e.g., Ayesha" />
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="field">
+                <label for="lastName">Last Name</label>
+                <input
+                  id="lastName"
+                  type="text"
+                  [(ngModel)]="filters.lastName"
+                  name="lastName"
+                  placeholder="e.g., Khan" />
+              </div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <!-- Phone -->
+            <div class="col">
+              <div class="field">
+                <label for="phone">Phone</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  [(ngModel)]="filters.phone"
+                  name="phone"
+                  placeholder="555-123-4567" />
+              </div>
+            </div>
+
+            <!-- Service Filter -->
+            <div class="col">
+              <div class="field">
+                <label for="service">Service</label>
+                <select id="service" [(ngModel)]="filters.serviceId" name="service">
+                  <option value="">All Services</option>
+                  @for (service of services; track service.service_id) {
+                    <option [value]="service.service_id">{{ service.service_name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <!-- Date Range -->
+            <div class="col">
+              <div class="field">
+                <label for="dateFrom">Appointment From</label>
+                <input
+                  id="dateFrom"
+                  type="date"
+                  [(ngModel)]="filters.dateFrom"
+                  name="dateFrom" />
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="field">
+                <label for="dateTo">Appointment To</label>
+                <input
+                  id="dateTo"
+                  type="date"
+                  [(ngModel)]="filters.dateTo"
+                  name="dateTo" />
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="visitType">Visit Type</label>
+            <select id="visitType" [(ngModel)]="filters.visitTypeId" name="visitType">
+              <option value="">All Visit Types</option>
+              @for (visitType of visitTypes; track visitType.visit_type_id) {
+                <option [value]="visitType.visit_type_id">{{ visitType.type_name }}</option>
+              }
+            </select>
+          </div>
+
+          @if (searchError) {
+            <div class="error-banner">{{ searchError }}</div>
+          }
+
+          <div class="actions">
+            <button type="button" class="btn btn-outline" (click)="onClear()">Clear</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isSearching">
+              {{ isSearching ? 'Searching...' : 'Search Customers' }}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Results Section -->
+      @if (hasSearched) {
+        <div class="results-section">
+          <div class="results-header">
+            <h3>
+              @if (isSearching) {
+                <span>Searching...</span>
+              } @else {
+                <span>Results: {{ filteredResults.length }} customer(s) found</span>
+              }
+            </h3>
+
+            @if (filteredResults.length > 0) {
+              <div class="sort-controls">
+                <label for="sortBy">Sort by:</label>
+                <select id="sortBy" [(ngModel)]="sortBy" (change)="onSortChange()">
+                  <option value="name">Name</option>
+                  <option value="last_visit">Last Visit</option>
+                  <option value="next_appointment">Next Appointment</option>
+                </select>
+                <button type="button" class="btn-icon" (click)="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'; onSortChange()">
+                  {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                </button>
+              </div>
+            }
+          </div>
+
+          <!-- Loading State -->
+          @if (isSearching) {
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Searching customers...</p>
+            </div>
+          }
+
+          <!-- No Results -->
+          @if (!isSearching && filteredResults.length === 0) {
+            <div class="no-results">
+              <p>No customers found matching your search criteria.</p>
+              <p class="help">Try adjusting your search filters or clearing them to start a new search.</p>
+            </div>
+          }
+
+          <!-- Results Cards -->
+          @if (!isSearching && paginatedResults.length > 0) {
+            <div class="results-grid">
+              @for (customer of paginatedResults; track customer.customer_id) {
+                <div class="customer-card">
+                  <div class="card-photo">
+                    <img [src]="getPhotoUrl(customer.profile_photo)" [alt]="customer.first_name + ' ' + customer.last_name" />
+                  </div>
+                  <div class="card-content">
+                    <h4>{{ customer.first_name }} {{ customer.last_name }}</h4>
+                    <div class="card-details">
+                      <div class="detail-row">
+                        <span class="label">Phone:</span>
+                        <span class="value">{{ formatPhone(customer.phone) }}</span>
+                      </div>
+                      @if (customer.email) {
+                        <div class="detail-row">
+                          <span class="label">Email:</span>
+                          <span class="value">{{ customer.email }}</span>
+                        </div>
+                      }
+                      <div class="detail-row">
+                        <span class="label">Last Visit:</span>
+                        <span class="value">{{ formatDate(customer.last_visit) }}</span>
+                      </div>
+                      @if (customer.next_appointment) {
+                        <div class="detail-row">
+                          <span class="label">Next:</span>
+                          <span class="value">{{ formatDate(customer.next_appointment) }}
+                            @if (customer.next_appointment_stylist) {
+                              <span class="stylist-name">({{ customer.next_appointment_stylist }})</span>
+                            }
+                          </span>
+                        </div>
+                      }
+                      <div class="detail-row">
+                        <span class="label">Total Visits:</span>
+                        <span class="value">{{ customer.total_visits }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Pagination -->
+            @if (totalPages > 1) {
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="btn btn-outline btn-small"
+                  (click)="prevPage()"
+                  [disabled]="currentPage === 1">
+                  ← Previous
+                </button>
+
+                <div class="page-numbers">
+                  @for (page of getPageNumbers(); track page) {
+                    <button
+                      type="button"
+                      class="page-btn"
+                      [class.active]="page === currentPage"
+                      (click)="goToPage(page)">
+                      {{ page }}
+                    </button>
+                  }
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-outline btn-small"
+                  (click)="nextPage()"
+                  [disabled]="currentPage === totalPages">
+                  Next →
+                </button>
+              </div>
+
+              <div class="pagination-info">
+                Showing {{ (currentPage - 1) * itemsPerPage + 1 }} -
+                {{ currentPage * itemsPerPage > filteredResults.length ? filteredResults.length : currentPage * itemsPerPage }}
+                of {{ filteredResults.length }} results
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Connection Status -->
+      <div class="connection-status-container">
+        <div class="connection-status" [ngClass]="{
+          'connected': dbConnection.connectionStatus() === 'connected',
+          'disconnected': dbConnection.connectionStatus() === 'disconnected',
+          'checking': dbConnection.connectionStatus() === 'checking'
+        }">
+          @if (dbConnection.connectionStatus() === 'connected') {
+            <span class="status-dot"></span>
+            <span>Database Connection Successful</span>
+          } @else if (dbConnection.connectionStatus() === 'disconnected') {
+            <span class="status-dot"></span>
+            <span>DB Disconnected</span>
+          } @else {
+            <span class="status-dot"></span>
+            <span>Checking connection...</span>
+          }
+        </div>
+        <p class="subtle">Angular Application • Full search capabilities enabled</p>
+      </div>
+    </div>
+  </div>
+</div>
