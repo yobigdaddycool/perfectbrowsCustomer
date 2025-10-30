@@ -6,7 +6,7 @@ $psi.UseShellExecute = $false
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
-$psi.EnvironmentVariables['SSH_AUTH_SOCK'] = '/tmp/ssh-siUUzPs7jHEg/agent.2031'
+$psi.EnvironmentVariables['SSH_AUTH_SOCK'] = '/tmp/ssh-ArS6KEpy0PHX/agent.2038'
 
 $process = [System.Diagnostics.Process]::Start($psi)
 $process.StandardInput.WriteLine($password)
