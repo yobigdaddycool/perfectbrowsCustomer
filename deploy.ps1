@@ -25,9 +25,19 @@ if ($agentOutput -match 'SSH_AGENT_PID=(\d+)') {
 
 Write-Host "Adding SSH key..."
 
-# Use Git Bash to add the key with password piped
-$bashCommand = "eval `$(ssh-agent -s) > /dev/null 2>&1; export SSH_AUTH_SOCK='$($env:SSH_AUTH_SOCK)'; export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'; echo '$sshKeyPassphrase' | ssh-add ~/.ssh/id_rsa 2>&1"
-& "C:\Program Files\Git\bin\bash.exe" -c $bashCommand | Out-Null
+# Convert Windows path to Unix path for bash
+$sshAuthSockUnix = $env:SSH_AUTH_SOCK -replace '\\', '/' -replace '^([A-Z]):', '/mnt/$1'.ToLower()
+
+# Use Git Bash to add the key with password piped - DON'T start new agent, use existing one
+$bashCommand = "export SSH_AUTH_SOCK='$sshAuthSockUnix'; export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'; echo '$sshKeyPassphrase' | ssh-add ~/.ssh/id_rsa"
+$output = & "C:\Program Files\Git\bin\bash.exe" -c $bashCommand 2>&1
+Write-Host "ssh-add output: $output"
+
+# Verify key was added
+Write-Host "Verifying key..."
+$verifyCommand = "export SSH_AUTH_SOCK='$sshAuthSockUnix'; ssh-add -l"
+$keyList = & "C:\Program Files\Git\bin\bash.exe" -c $verifyCommand 2>&1
+Write-Host "Keys in agent: $keyList"
 
 Start-Sleep -Seconds 1
 
