@@ -1,8 +1,8 @@
-﻿import { Component, ViewChild, ElementRef, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+﻿import { Component, ViewChild, ElementRef, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
 
 @Component({
@@ -20,6 +20,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   isEditMode = false;
   customerId: number | null = null;
   isLoadingCustomer = false;
+
+  // Form dirty tracking
+  isFormDirty = false;
+  originalFormData: string = '';
 
   customer = {
     firstName: '',
@@ -57,8 +61,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
+    private router: Router,
     public dbConnection: DatabaseConnectionService
   ) {}
+
+  // Method to check if user can leave (for navigation guard)
+  canDeactivate(): boolean {
+    if (this.isFormDirty) {
+      return confirm('You have unsaved changes. Are you sure you want to leave?');
+    }
+    return true;
+  }
 
   ngOnInit() {
     console.log('🚀 RegisterComponent initialized');
@@ -91,7 +104,20 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopCamera();
+    // Remove beforeunload listener
+    window.removeEventListener('beforeunload', this.handleBeforeUnload);
   }
+
+  // Warn user before leaving page with unsaved changes
+  @HostListener('window:beforeunload', ['$event'])
+  handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (this.isFormDirty) {
+      event.preventDefault();
+      event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return event.returnValue;
+    }
+    return;
+  };
 
   loadCustomerData(customerId: number) {
     this.isLoadingCustomer = true;
@@ -161,6 +187,29 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
 
     console.log('Customer data populated:', this.customer);
+
+    // Store original form data after loading
+    this.storeOriginalFormData();
+  }
+
+  // Store original form data to compare later
+  storeOriginalFormData() {
+    this.originalFormData = JSON.stringify({
+      ...this.customer,
+      photo: this.capturedPhoto
+    });
+    this.isFormDirty = false;
+    console.log('📋 Original form data stored');
+  }
+
+  // Check if form has been modified
+  checkFormDirty() {
+    const currentFormData = JSON.stringify({
+      ...this.customer,
+      photo: this.capturedPhoto
+    });
+    this.isFormDirty = currentFormData !== this.originalFormData;
+    console.log('🔍 Form dirty check:', this.isFormDirty);
   }
 
   onSubmit() {
@@ -203,13 +252,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
       emailConsent: this.customer.emailConsent ? 1 : 0
     };
 
-    // Include photo if it was captured/changed
-    if (this.capturedPhoto) {
+    // Include photo ONLY if it's a new base64 capture (not an existing URL)
+    if (this.capturedPhoto && this.capturedPhoto.startsWith('data:image')) {
       // Only send the base64 string, truncate for logging
       updateData.photo = this.capturedPhoto;
       const photoPreview = this.capturedPhoto.substring(0, 100) + '...';
-      console.log('📸 Including photo in update (preview):', photoPreview);
+      console.log('📸 Including NEW photo in update (preview):', photoPreview);
       console.log('📸 Photo length:', this.capturedPhoto.length, 'characters');
+    } else if (this.capturedPhoto) {
+      console.log('📸 Existing photo (URL), not sending to API:', this.capturedPhoto.substring(0, 100));
     } else {
       console.log('⚠️ No photo to include');
     }
@@ -236,13 +287,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
 
           console.log('🔄 Triggering change detection');
-          this.cdr.detectChanges();
 
-          // Show success message in next tick to avoid change detection error
-          setTimeout(() => {
-            this.showToastMessage('Customer updated successfully!');
-            console.log('✅ Customer updated successfully');
-          }, 0);
+          // Mark form as clean after successful save
+          this.storeOriginalFormData();
+
+          // Show success message
+          const successMessage = this.isEditMode ? 'Customer Updated Successfully!' : 'Customer Saved Successfully!';
+          console.log('✅ Customer operation completed successfully');
+          console.log('🍞 About to show toast:', successMessage);
+
+          this.cdr.detectChanges();
+          this.showToastMessage(successMessage);
         } else {
           this.cdr.detectChanges();
           this.showToastMessage('Failed to update customer: ' + response.message);
@@ -262,6 +317,13 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   onClear() {
+    // Warn if there are unsaved changes
+    if (this.isFormDirty) {
+      if (!confirm('You have unsaved changes. Are you sure you want to clear the form?')) {
+        return;
+      }
+    }
+
     this.customer = {
       firstName: '',
       lastName: '',
@@ -279,6 +341,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
     };
     this.fieldErrors = {};
     this.flashingFields.clear();
+    this.capturedPhoto = null;
+    this.photoPreview = null;
+
+    // Reset dirty flag
+    this.storeOriginalFormData();
   }
 
   validateForm(): { [key: string]: string } {
@@ -426,10 +493,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   private showToastMessage(message: string) {
+    console.log('🍞 Showing toast message:', message);
     this.toastMessage = message;
     this.showToast = true;
+    this.cdr.detectChanges(); // Force UI update for toast
+    console.log('🍞 Toast state - showToast:', this.showToast, 'message:', this.toastMessage);
+
     setTimeout(() => {
       this.showToast = false;
+      this.cdr.detectChanges();
     }, 3000);
   }
 
@@ -525,6 +597,7 @@ hideToast() {
     console.log('📸 Captured photo set, length:', this.capturedPhoto?.length);
     this.closeCamera();
     this.showToastMessage('Photo captured successfully!');
+    this.checkFormDirty(); // Mark form as dirty when photo changes
     this.cdr.detectChanges(); // Ensure UI updates
   }
 

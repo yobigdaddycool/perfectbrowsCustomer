@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <form class="content" #customerForm="ngForm" (ngSubmit)="onSubmit()">
+    <form class="content" #customerForm="ngForm" (ngSubmit)="onSubmit()" (change)="checkFormDirty()">
       <!-- Loading state -->
       @if (isLoadingCustomer) {
         <div class="loading-state" style="text-align: center; padding: 40px;">
@@ -26,9 +26,10 @@
           <div class="row">
             <div class="field">
               <label for="firstName" class="req">First Name</label>
-              <input id="firstName" type="text" [(ngModel)]="customer.firstName" name="firstName" 
-                     placeholder="e.g., Ayesha" required 
+              <input id="firstName" type="text" [(ngModel)]="customer.firstName" name="firstName"
+                     placeholder="e.g., Ayesha" required
                      (blur)="validateField('firstName', customer.firstName)"
+                     (ngModelChange)="checkFormDirty()"
                      [class.error]="fieldErrors['firstName']"
                      [class.flash-error]="isFlashing('firstName')" />
               @if (fieldErrors['firstName']) {
@@ -276,11 +277,17 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn btn-outline" (click)="onClear()">Clear</button>
-        <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer">
+        <button type="button" class="btn btn-outline" (click)="onClear()" [disabled]="cameraActive">Clear</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer || cameraActive">
           {{ isEditMode ? 'Update Customer' : 'Save Customer' }}
         </button>
       </div>
+
+      @if (cameraActive) {
+        <div class="info-message" style="text-align: center; color: #ff6b35; margin-top: 10px;">
+          Please finish capturing photo before saving
+        </div>
+      }
 
       <!-- Connection Status Indicator -->
       <div class="connection-status-container">
