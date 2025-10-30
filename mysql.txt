@@ -2,12 +2,12 @@
 -- Perfect Brows Customer Management System
 -- Database Schema Setup Script
 -- ============================================
--- Database: ichrqhmy_perfectbrows
+-- Database: ichrqhmy_PerfectCustomer
 -- Description: Complete schema for customer, appointments, and salon management
 -- ============================================
 
 -- Use the database
-USE ichrqhmy_perfectbrows;
+USE ichrqhmy_PerfectCustomer;
 
 -- ============================================
 -- DROP TABLES (if exists - for clean setup)
