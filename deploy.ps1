@@ -3,27 +3,43 @@
 # ============================================
 $sshKeyPassphrase = "Perfect123!"
 
-# Check if ssh-agent is already running
-$agentRunning = Get-Process ssh-agent -ErrorAction SilentlyContinue
-if (-not $agentRunning) {
-    Write-Host "Starting ssh-agent..."
-    Start-Service ssh-agent -ErrorAction SilentlyContinue
-    # If service doesn't exist, start manually
-    if (-not (Get-Service ssh-agent -ErrorAction SilentlyContinue)) {
-        Start-Process ssh-agent -WindowStyle Hidden
-        Start-Sleep -Seconds 2
-    }
+Write-Host "Setting up SSH agent..."
+
+# Start ssh-agent and capture output
+$agentOutput = & "C:\Program Files\Git\usr\bin\ssh-agent.exe" 2>&1 | Out-String
+
+# Parse and set environment variables
+if ($agentOutput -match 'SSH_AUTH_SOCK=([^;]+)') {
+    $env:SSH_AUTH_SOCK = $Matches[1]
+}
+if ($agentOutput -match 'SSH_AGENT_PID=(\d+)') {
+    $env:SSH_AGENT_PID = $Matches[1]
 }
 
-# Create a simple batch file to pass the passphrase
-$batchPath = "$PSScriptRoot\_add_key.bat"
-@"
-@echo off
-echo $sshKeyPassphrase| ssh-add "$env:USERPROFILE\.ssh\id_rsa"
-"@ | Out-File -FilePath $batchPath -Encoding ASCII -Force
+# Create expect-style script using PowerShell
+$expectScript = @"
+`$password = '$sshKeyPassphrase'
+`$psi = New-Object System.Diagnostics.ProcessStartInfo
+`$psi.FileName = 'C:\Program Files\Git\usr\bin\ssh-add.exe'
+`$psi.Arguments = '`$env:USERPROFILE\.ssh\id_rsa'
+`$psi.UseShellExecute = `$false
+`$psi.RedirectStandardInput = `$true
+`$psi.RedirectStandardOutput = `$true
+`$psi.RedirectStandardError = `$true
+`$psi.EnvironmentVariables['SSH_AUTH_SOCK'] = '$($env:SSH_AUTH_SOCK)'
+
+`$process = [System.Diagnostics.Process]::Start(`$psi)
+`$process.StandardInput.WriteLine(`$password)
+`$process.StandardInput.Close()
+`$process.WaitForExit()
+"@
+
+$expectScriptPath = "$PSScriptRoot\_expect.ps1"
+$expectScript | Out-File -FilePath $expectScriptPath -Encoding UTF8 -Force
 
 Write-Host "Adding SSH key..."
-& cmd /c $batchPath 2>&1 | Out-Null
+& powershell -File $expectScriptPath
+Start-Sleep -Seconds 1
 
 # push MAIN
 git add -A
@@ -69,8 +85,11 @@ cd ..
 git worktree remove .deploy_publish -f 2>$null
 
 # ============================================
-# Cleanup: Remove helper files
+# Cleanup: Stop ssh-agent and remove helper files
 # ============================================
 Write-Host "Cleaning up..."
-Remove-Item -Path "$PSScriptRoot\_add_key.bat" -Force -ErrorAction SilentlyContinue
+if ($env:SSH_AGENT_PID) {
+    & "C:\Program Files\Git\usr\bin\ssh-agent.exe" -k 2>&1 | Out-Null
+}
+Remove-Item -Path "$PSScriptRoot\_expect.ps1" -Force -ErrorAction SilentlyContinue
 Write-Host "Deployment complete!"
