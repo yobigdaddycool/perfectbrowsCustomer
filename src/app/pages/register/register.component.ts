@@ -168,17 +168,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Populate most recent appointment data if available
     if (data.last_appointment) {
-      this.customer.stylist = data.last_appointment.stylist_id || '';
-      this.customer.service = data.last_appointment.service_id || '';
+      // Use stylist first name (matches dropdown options like "Anna", "Layla")
+      this.customer.stylist = data.last_appointment.stylist_first_name || '';
+      // Use service name (matches dropdown options like "Threading", "Waxing")
+      this.customer.service = data.last_appointment.service_name || '';
       this.customer.visitType = data.last_appointment.visit_type || 'Return';
       this.customer.notes = data.last_appointment.notes || '';
       this.customer.price = data.last_appointment.quoted_price || '';
+
+      console.log('📅 Populated appointment - Stylist:', this.customer.stylist, 'Service:', this.customer.service);
 
       // Parse date/time if available
       if (data.last_appointment.appointment_datetime) {
         const datetime = new Date(data.last_appointment.appointment_datetime);
         this.customer.date = datetime.toISOString().split('T')[0];
         this.customer.time = datetime.toTimeString().slice(0, 5);
+        console.log('📅 Populated date/time - Date:', this.customer.date, 'Time:', this.customer.time);
       }
     }
 
@@ -256,8 +261,23 @@ export class RegisterComponent implements OnInit, OnDestroy {
       phone: this.customer.phone,
       email: this.customer.email,
       smsConsent: this.customer.smsConsent ? 1 : 0,
-      emailConsent: this.customer.emailConsent ? 1 : 0
+      emailConsent: this.customer.emailConsent ? 1 : 0,
+      // Appointment data
+      date: this.customer.date,
+      time: this.customer.time,
+      stylist: this.customer.stylist,
+      service: this.customer.service,
+      visitType: this.customer.visitType,
+      notes: this.customer.notes,
+      price: this.customer.price
     };
+
+    console.log('📅 Appointment data being sent:', {
+      date: this.customer.date,
+      time: this.customer.time,
+      stylist: this.customer.stylist,
+      service: this.customer.service
+    });
 
     // Handle photo deletion or upload
     if (this.shouldDeletePhoto) {
