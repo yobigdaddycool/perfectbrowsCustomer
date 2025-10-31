@@ -87,6 +87,7 @@
             <div class="field">
               <label for="stylist" class="req">Stylist</label>
               <select id="stylist" [(ngModel)]="customer.stylist" name="stylist" required
+                      (change)="validateField('stylist', customer.stylist)"
                       [class.error]="fieldErrors['stylist']"
                       [class.flash-error]="isFlashing('stylist')">
                 <option value="" selected disabled>Select stylist…</option>
@@ -115,6 +116,7 @@
           <div class="field">
             <label for="service" class="req">Service</label>
             <select id="service" [(ngModel)]="customer.service" name="service" required
+                    (change)="validateField('service', customer.service)"
                     [class.error]="fieldErrors['service']"
                     [class.flash-error]="isFlashing('service')">
               <option value="" selected disabled>Select a service…</option>

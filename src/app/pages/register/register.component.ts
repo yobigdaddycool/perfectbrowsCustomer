@@ -608,6 +608,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
           delete this.fieldErrors['price'];
         }
         break;
+
+      case 'stylist':
+        if (!value) {
+          this.fieldErrors['stylist'] = 'Please select a stylist';
+        } else {
+          delete this.fieldErrors['stylist'];
+        }
+        break;
+
+      case 'service':
+        if (!value) {
+          this.fieldErrors['service'] = 'Please select a service';
+        } else {
+          delete this.fieldErrors['service'];
+        }
+        break;
     }
   }
 
