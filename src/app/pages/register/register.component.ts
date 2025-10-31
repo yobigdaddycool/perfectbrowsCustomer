@@ -724,7 +724,15 @@ hideToast() {
 
   async openCamera() {
     this.cameraError = null;
+
+    // Set cameraActive FIRST to render the video element
+    this.cameraActive = true;
+
+    // Force Angular to detect changes and render the video element
+    this.cdr.detectChanges();
+
     try {
+      // Now request camera access after video element is rendered
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
@@ -733,16 +741,12 @@ hideToast() {
         }
       });
 
-      this.cameraActive = true;
-
-      // Force Angular to detect changes and render the video element
-      this.cdr.detectChanges();
-
       // Wait for Angular to render the video element, then start playback
       this.startVideoPlayback();
 
     } catch (error: any) {
       console.error('Camera access error:', error);
+      this.cameraActive = false; // Reset if camera fails
       this.cameraError = 'Unable to access camera. Please check permissions.';
       if (error.name === 'NotAllowedError') {
         this.cameraError = 'Camera access denied. Please allow camera permissions.';
@@ -750,6 +754,7 @@ hideToast() {
         this.cameraError = 'No camera found on this device.';
       }
       this.showToastMessage(this.cameraError);
+      this.cdr.detectChanges();
     }
   }
 
