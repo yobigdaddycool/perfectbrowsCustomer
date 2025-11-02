@@ -2,7 +2,8 @@
 // db-config.php - Database configuration
 $host = '50.6.108.147';
 $port = '3306';
-$dbname = 'ichrqhmy_PerfectCustomer';
+$dbname = '
+';
 $username = 'ichrqhmy_testuser';
 $password = 'Destruction123!';
 

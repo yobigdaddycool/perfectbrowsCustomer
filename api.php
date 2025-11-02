@@ -398,6 +398,17 @@ function getCustomer(&$response) {
             return;
         }
 
+        // Get active QR code value if available
+        $qrSql = "SELECT qr_code_value
+                  FROM customer_qr_codes
+                  WHERE customer_id = :customerId AND is_active = 1
+                  ORDER BY qr_code_id DESC
+                  LIMIT 1";
+        $stmt = $pdo->prepare($qrSql);
+        $stmt->execute([':customerId' => $customerId]);
+        $qrRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        $customer['qr_code_value'] = $qrRow ? $qrRow['qr_code_value'] : null;
+
         // Get most recent appointment details
         $appointmentSql = "SELECT
                 a.appointment_id,
@@ -467,6 +478,7 @@ function updateCustomer(&$response) {
         $emailConsent = isset($data['emailConsent']) ? (int)$data['emailConsent'] : 0;
         $photo = $data['photo'] ?? null; // Base64 photo string
         $deletePhoto = isset($data['deletePhoto']) ? (bool)$data['deletePhoto'] : false;
+        $qrAction = isset($data['qrAction']) ? strtolower(trim((string)$data['qrAction'])) : null;
 
         // Appointment data
         $appointmentDate = $data['date'] ?? null;
@@ -685,11 +697,74 @@ function updateCustomer(&$response) {
             }
         }
 
+        $qrCodeValue = null;
+        $successMessage = "Customer updated successfully";
+
+        if ($qrAction === 'delete') {
+            try {
+                $deactivateQrSql = "UPDATE customer_qr_codes SET is_active = 0 WHERE customer_id = :customerId";
+                $stmt = $pdo->prepare($deactivateQrSql);
+                $stmt->execute([':customerId' => $customerId]);
+                $response['debug'][] = "🗑️ QR code deactivated for customer ID: $customerId";
+                $successMessage = "QR code removed successfully";
+            } catch (PDOException $qrException) {
+                $response['debug'][] = "⚠️ Failed to deactivate QR code: " . $qrException->getMessage();
+            }
+        } elseif ($qrAction === 'regenerate') {
+            $qrPayload = [
+                'customerId' => (string)$customerId,
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'phone' => $phone,
+                'email' => $email,
+                'generatedAt' => gmdate('c')
+            ];
+
+            $encodedPayload = json_encode($qrPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            if ($encodedPayload === false) {
+                $response['debug'][] = "⚠️ Failed to encode QR payload during regenerate";
+            } else {
+                try {
+                    $deactivateQrSql = "UPDATE customer_qr_codes SET is_active = 0 WHERE customer_id = :customerId";
+                    $stmt = $pdo->prepare($deactivateQrSql);
+                    $stmt->execute([':customerId' => $customerId]);
+
+                    $insertQrSql = "INSERT INTO customer_qr_codes (customer_id, qr_code_value, is_active, created_at)
+                        VALUES (:customerId, :qrCodeValue, 1, NOW())";
+                    $stmt = $pdo->prepare($insertQrSql);
+                    $stmt->execute([
+                        ':customerId' => $customerId,
+                        ':qrCodeValue' => $encodedPayload
+                    ]);
+
+                    $response['debug'][] = "✅ QR code regenerated for customer ID: $customerId";
+                    $successMessage = "QR code regenerated successfully";
+                } catch (PDOException $qrException) {
+                    $response['debug'][] = "⚠️ Failed to regenerate QR code: " . $qrException->getMessage();
+                }
+            }
+        }
+
+        // Fetch the current active QR code (if any) to return to client
+        $currentQrSql = "SELECT qr_code_value
+                         FROM customer_qr_codes
+                         WHERE customer_id = :customerId AND is_active = 1
+                         ORDER BY qr_code_id DESC
+                         LIMIT 1";
+        $stmt = $pdo->prepare($currentQrSql);
+        $stmt->execute([':customerId' => $customerId]);
+        $qrRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($qrRow) {
+            $qrCodeValue = $qrRow['qr_code_value'];
+        }
+
         $response['success'] = true;
-        $response['message'] = "Customer updated successfully";
+        $response['message'] = $successMessage;
         $response['data'] = [
             'customerId' => $customerId,
-            'photoPath' => $photoPath
+            'photoPath' => $photoPath,
+            'qrCodeValue' => $qrCodeValue
         ];
 
     } catch (PDOException $e) {
@@ -940,7 +1015,8 @@ function createCustomer(&$response) {
             'firstName' => $firstName,
             'lastName' => $lastName,
             'phone' => $phone,
-            'email' => $email
+            'email' => $email,
+            'generatedAt' => gmdate('c')
         ];
 
         $qrCodeValue = json_encode($qrPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
