@@ -75,7 +75,7 @@ INSERT INTO `appointments` (
 ),
 
 -- Customer 2: Today's appointment (checked in)
-(
+(on the register page, i need the search button link to be poitning to the search 
     2,
     3, -- Maria
     4, -- Lashes
@@ -199,7 +199,7 @@ WHERE check_in_status = 'checked_in' AND appointment_date = CURDATE();
 --   - TestFirstName02 TestLastName02 (2 appointments, 1 photo)
 --   - TestFirstName03 TestLastName03 (2 appointments, 1 photo)
 --
--- ✓ 6 Test Appointments
+-- ✓ 6 Test Appointmentsyr
 --   - 1 Completed (past)
 --   - 1 Checked-in (today)
 --   - 1 No-show (past)

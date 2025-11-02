@@ -217,8 +217,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
     // Store original form data after loading
     this.storeOriginalFormData();
 
-    // Generate QR code for this customer
-    this.generateQRCode();
+    // Render QR code for this customer if one exists
+    if (data.qr_code_value) {
+      this.qrCodeValue = data.qr_code_value;
+      this.generateQRCode(data.qr_code_value);
+    } else {
+      this.qrCodeValue = null;
+      this.qrCodeDataUrl = null;
+      this.qrCodeError = null;
+    }
   }
 
   // Store original form data to compare later
@@ -317,15 +324,26 @@ export class RegisterComponent implements OnInit, OnDestroy {
           if (customerId) {
             this.customerId = customerId;
             const backendQrValue = response.data?.qrCodeValue || null;
-            this.generateQRCode(backendQrValue);
+            if (backendQrValue) {
+              this.qrCodeValue = backendQrValue;
+              this.generateQRCode(backendQrValue);
+            } else {
+              this.qrCodeValue = null;
+              this.qrCodeDataUrl = null;
+              this.qrCodeError = null;
+            }
           }
 
           this.showToastMessage('Customer Saved Successfully!');
 
-          // Clear the form after successful save
-          setTimeout(() => {
-            this.onClear();
-          }, 2000);
+          // Switch into edit mode and reload the customer so form reflects saved data
+          if (customerId) {
+            this.isEditMode = true;
+            this.customerId = customerId;
+            setTimeout(() => {
+              this.loadCustomerData(customerId);
+            }, 500);
+          }
         } else {
           this.showToastMessage('Failed to create customer: ' + response.message);
           console.error('❌ Create failed:', response.message);
@@ -339,7 +357,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     });
   }
 
-  updateCustomer() {
+  updateCustomer(qrAction?: 'regenerate' | 'delete') {
     console.log('💾 Updating customer ID:', this.customerId);
     console.log('📋 Current customer data:', this.customer);
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
@@ -363,6 +381,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
       notes: this.customer.notes,
       price: this.customer.price
     };
+
+    if (qrAction) {
+      updateData.qrAction = qrAction;
+      console.log('🔄 QR action requested:', qrAction);
+    }
 
     console.log('📅 Appointment data being sent:', {
       date: this.customer.date,
@@ -423,16 +446,28 @@ export class RegisterComponent implements OnInit, OnDestroy {
           // Mark form as clean after successful save
           this.storeOriginalFormData();
 
-          // Show success message
-          const successMessage = this.isEditMode ? 'Customer Updated Successfully!' : 'Customer Saved Successfully!';
+          const qrValueFromResponse = response.data?.qrCodeValue ?? null;
+          if (qrValueFromResponse) {
+            this.qrCodeValue = qrValueFromResponse;
+            void this.generateQRCode(qrValueFromResponse);
+          } else if (qrAction === 'delete') {
+            this.qrCodeValue = null;
+            this.qrCodeDataUrl = null;
+            this.qrCodeError = null;
+          }
+
+          let successMessage = this.isEditMode ? 'Customer Updated Successfully!' : 'Customer Saved Successfully!';
+          if (qrAction === 'regenerate') {
+            successMessage = 'QR Code Regenerated Successfully!';
+          } else if (qrAction === 'delete') {
+            successMessage = 'QR Code Removed Successfully!';
+          }
+
           console.log('✅ Customer operation completed successfully');
           console.log('🍞 About to show toast:', successMessage);
 
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
-
-          // Generate QR code after successful update
-          this.generateQRCode();
 
           // Reload customer data to ensure UI is in sync with database
           if (this.isEditMode && this.customerId) {
@@ -459,9 +494,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
     });
   }
 
-  onClear() {
+  onClear(skipConfirm: boolean = false) {
     // Warn if there are unsaved changes
-    if (this.isFormDirty) {
+    if (!skipConfirm && this.isFormDirty) {
       if (!confirm('You have unsaved changes. Are you sure you want to clear the form?')) {
         return;
       }
@@ -486,6 +521,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.flashingFields.clear();
     this.capturedPhoto = null;
     this.photoPreview = null;
+    this.qrCodeDataUrl = null;
+    this.qrCodeValue = null;
+    this.qrCodeError = null;
 
     // Reset dirty flag
     this.storeOriginalFormData();
@@ -907,6 +945,35 @@ hideToast() {
   }
 
   // QR Code Methods
+
+  regenerateQrCode() {
+    if (!this.customerId) {
+      this.showToastMessage('Please save the customer before generating a QR code.');
+      return;
+    }
+
+    if (this.isLoadingCustomer) {
+      console.warn('⚠️ Cannot regenerate QR while customer data is loading');
+      return;
+    }
+
+    console.log('🔄 Regenerating QR code for customer ID:', this.customerId);
+    this.updateCustomer('regenerate');
+  }
+
+  removeQrCode() {
+    if (!this.customerId) {
+      return;
+    }
+
+    const confirmed = confirm('Are you sure you want to remove this customer\'s QR code?');
+    if (!confirmed) {
+      return;
+    }
+
+    console.log('🗑️ Removing QR code for customer ID:', this.customerId);
+    this.updateCustomer('delete');
+  }
 
   async generateQRCode(prefilledValue?: string | null) {
     try {

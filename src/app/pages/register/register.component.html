@@ -157,6 +157,14 @@
                 <div class="help" style="margin-top: 10px; color: #666;">
                   Scan this code to access customer information
                 </div>
+                <div style="margin-top: 12px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer || !customerId">
+                    Regenerate QR Code
+                  </button>
+                  <button type="button" class="btn btn-outline" (click)="removeQrCode()" [disabled]="isLoadingCustomer || !customerId">
+                    Remove QR Code
+                  </button>
+                </div>
               </div>
             } @else if (qrCodeError) {
               <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
@@ -166,6 +174,13 @@
               <div style="padding: 15px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; color: #666;">
                 QR code will be generated after customer data is loaded or saved
               </div>
+              @if (isEditMode && customerId) {
+                <div style="margin-top: 12px; text-align: center;">
+                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer">
+                    Generate QR Code
+                  </button>
+                </div>
+              }
             }
           </div>
         </div>
