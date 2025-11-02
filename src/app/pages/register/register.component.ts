@@ -58,6 +58,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   // QR Code properties
   qrCodeDataUrl: string | null = null;
+  qrCodeValue: string | null = null;
   qrCodeError: string | null = null;
 
   // API URL - must use Bluehost URL (database only accessible from Bluehost server)
@@ -315,7 +316,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
           // Generate QR code for the new customer
           if (customerId) {
             this.customerId = customerId;
-            this.generateQRCode();
+            const backendQrValue = response.data?.qrCodeValue || null;
+            this.generateQRCode(backendQrValue);
           }
 
           this.showToastMessage('Customer Saved Successfully!');
@@ -906,21 +908,28 @@ hideToast() {
 
   // QR Code Methods
 
-  async generateQRCode() {
+  async generateQRCode(prefilledValue?: string | null) {
     try {
       console.log('🔲 Generating QR code for customer...');
 
-      // Create QR code data with customer information
-      const qrData = {
-        customerId: this.customerId || 'NEW',
-        firstName: this.customer.firstName,
-        lastName: this.customer.lastName,
-        phone: this.customer.phone,
-        email: this.customer.email
-      };
+      let qrString = prefilledValue || null;
+      if (qrString) {
+        console.log('🔲 Using backend-provided QR payload:', qrString);
+      } else {
+        // Create QR code data with customer information
+        const qrData = {
+          customerId: this.customerId || 'NEW',
+          firstName: this.customer.firstName,
+          lastName: this.customer.lastName,
+          phone: this.customer.phone,
+          email: this.customer.email
+        };
 
-      const qrString = JSON.stringify(qrData);
-      console.log('🔲 QR code data:', qrString);
+        qrString = JSON.stringify(qrData);
+        console.log('🔲 QR code data:', qrString);
+      }
+
+      this.qrCodeValue = qrString;
 
       // Generate QR code as data URL
       this.qrCodeDataUrl = await QRCode.toDataURL(qrString, {

@@ -934,11 +934,52 @@ function createCustomer(&$response) {
             }
         }
 
+        // Generate QR code value for this customer
+        $qrPayload = [
+            'customerId' => (string)$customerId,
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'phone' => $phone,
+            'email' => $email
+        ];
+
+        $qrCodeValue = json_encode($qrPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($qrCodeValue === false) {
+            $response['debug'][] = "⚠️ Failed to encode QR payload to JSON";
+            $qrCodeValue = null;
+        } else {
+            $response['debug'][] = "📇 Generated QR payload: " . $qrCodeValue;
+        }
+
+        if ($qrCodeValue !== null) {
+            try {
+                // Deactivate any existing QR codes for this customer (safety)
+                $deactivateQrSql = "UPDATE customer_qr_codes SET is_active = 0 WHERE customer_id = :customerId";
+                $stmt = $pdo->prepare($deactivateQrSql);
+                $stmt->execute([':customerId' => $customerId]);
+
+                // Insert the active QR code record
+                $insertQrSql = "INSERT INTO customer_qr_codes (customer_id, qr_code_value, is_active, created_at)
+                    VALUES (:customerId, :qrCodeValue, 1, NOW())";
+                $stmt = $pdo->prepare($insertQrSql);
+                $stmt->execute([
+                    ':customerId' => $customerId,
+                    ':qrCodeValue' => $qrCodeValue
+                ]);
+
+                $response['debug'][] = "✅ QR code stored for customer ID: $customerId";
+            } catch (PDOException $qrException) {
+                $response['debug'][] = "⚠️ Failed to persist QR code: " . $qrException->getMessage();
+            }
+        }
+
         $response['success'] = true;
         $response['message'] = "Customer created successfully";
         $response['data'] = [
             'customerId' => $customerId,
-            'photoPath' => $photoPath
+            'photoPath' => $photoPath,
+            'qrCodeValue' => $qrCodeValue
         ];
 
     } catch (PDOException $e) {
