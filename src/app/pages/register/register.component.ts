@@ -251,8 +251,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Check for duplicate phone numbers (unless it's all ones or in edit mode)
-    if (!this.isEditMode && !this.isAllOnesPhone(this.customer.phone)) {
+    // Check for duplicate phone numbers (unless in edit mode)
+    if (!this.isEditMode) {
       const isDuplicate = await this.checkDuplicatePhone(this.customer.phone);
       if (isDuplicate) {
         this.fieldErrors['phone'] = 'This phone number is already registered';
@@ -884,18 +884,21 @@ hideToast() {
       const url = `${this.apiUrl}?action=check-duplicate-phone&phone=${encodeURIComponent(digitsOnly)}`;
 
       console.log('🔍 Checking for duplicate phone:', digitsOnly);
+      console.log('🔍 API URL:', url);
 
       const response = await this.http.get<any>(url).toPromise();
+      console.log('🔍 Duplicate check response:', response);
 
-      if (response && response.exists) {
-        console.log('❌ Phone number already exists');
+      if (response && response.data && response.data.exists) {
+        console.log('❌ Phone number already exists - Customer ID:', response.data.customerId);
         return true;
       }
 
-      console.log('✅ Phone number is unique');
+      console.log('✅ Phone number is unique - proceeding with creation');
       return false;
     } catch (error) {
       console.error('❌ Error checking duplicate phone:', error);
+      console.error('❌ Error details:', error);
       // On error, allow the submission to proceed (fail open)
       return false;
     }
