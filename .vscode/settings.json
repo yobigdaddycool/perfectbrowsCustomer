@@ -1,9 +1,18 @@
 {
-    "chat.tools.edits.autoApprove": {
-        "src/**": true,
-        "**/*.{csproj,fsproj,vbproj}": true,
-        "**/.vscode/*.json": true,
-        "**/.git/**": true,
-        "**/{package.json,package-lock.json,server.xml,build.rs,web.config,.gitattributes,.env}": true
-    }
+  "chat.tools.edits.autoApprove": {
+    // ----- Allow normal code paths first -----
+    "src/**": true,
+    "apps/**": true,
+    "libs/**": true,
+    "client/**": true,
+    "server/**": true,
+
+    // ----- Default allow for everything else -----
+    "**/*": true,
+
+    // ----- Deny the dangerous stuff LAST (overrides above) -----
+    "**/.vscode/*.json": false,
+    "**/.git/**": false,
+    "**/{package.json,package-lock.json,server.xml,build.rs,web.config,.gitattributes,.env,*.csproj,*.fsproj,*.vbproj}": false
+  }
 }

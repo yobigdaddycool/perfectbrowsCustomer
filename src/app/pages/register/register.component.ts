@@ -60,6 +60,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
   qrCodeDataUrl: string | null = null;
   qrCodeValue: string | null = null;
   qrCodeError: string | null = null;
+  qrGeneratedAtDisplay: string | null = null;
+
+  // UI state helpers
+  isPhotoProcessing = false;
+  lastErrorDetails: string | null = null;
+  showErrorDetails = false;
 
   // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
@@ -137,6 +143,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   loadCustomerData(customerId: number) {
     this.isLoadingCustomer = true;
+    this.isPhotoProcessing = false;
     const url = `${this.apiUrl}?action=get-customer&customerId=${customerId}`;
 
     console.log('🔍 Loading customer data for ID:', customerId);
@@ -236,7 +243,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
       this.qrCodeValue = null;
       this.qrCodeDataUrl = null;
       this.qrCodeError = null;
+      this.qrGeneratedAtDisplay = null;
     }
+
+    this.isPhotoProcessing = false;
   }
 
   // Store original form data to compare later
@@ -465,6 +475,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
             this.qrCodeValue = null;
             this.qrCodeDataUrl = null;
             this.qrCodeError = null;
+            this.qrGeneratedAtDisplay = null;
           }
 
           let successMessage = this.isEditMode ? 'Customer Updated Successfully!' : 'Customer Saved Successfully!';
@@ -479,6 +490,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
+          this.scrollToTop();
 
           // Reload customer data to ensure UI is in sync with database
           if (this.isEditMode && this.customerId) {
@@ -487,7 +499,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
               this.loadCustomerData(this.customerId!);
             }, 500);
           }
+          this.isPhotoProcessing = false;
+          this.lastErrorDetails = null;
+          this.showErrorDetails = false;
         } else {
+          this.isPhotoProcessing = false;
+          this.lastErrorDetails = JSON.stringify(
+            { message: response.message, debug: response.debug ?? null },
+            null,
+            2
+          );
+          this.showErrorDetails = false;
           this.cdr.detectChanges();
           this.showToastMessage('Failed to update customer: ' + response.message);
           console.error('❌ Update failed:', response.message);
@@ -497,6 +519,18 @@ export class RegisterComponent implements OnInit, OnDestroy {
         console.error('❌ HTTP Error updating customer:', error);
         console.log('🔄 Setting isLoadingCustomer to FALSE (error)');
         this.isLoadingCustomer = false;
+        this.isPhotoProcessing = false;
+        this.lastErrorDetails = JSON.stringify(
+          {
+            status: error.status,
+            statusText: error.statusText,
+            message: error.message,
+            error: error.error
+          },
+          null,
+          2
+        );
+        this.showErrorDetails = false;
         this.cdr.detectChanges();
         setTimeout(() => {
           this.showToastMessage('Error updating customer. Please try again.');
@@ -535,6 +569,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.qrCodeDataUrl = null;
     this.qrCodeValue = null;
     this.qrCodeError = null;
+    this.qrGeneratedAtDisplay = null;
 
     // Reset dirty flag
     this.storeOriginalFormData();
@@ -691,6 +726,34 @@ export class RegisterComponent implements OnInit, OnDestroy {
           delete this.fieldErrors['service'];
         }
         break;
+    }
+  }
+
+  private setQrMeta(qrString: string | null): void {
+    if (!qrString) {
+      this.qrGeneratedAtDisplay = null;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(qrString);
+      const generatedAt = parsed.generatedAt ?? new Date().toISOString();
+      if (!parsed.generatedAt) {
+        parsed.generatedAt = generatedAt;
+        this.qrCodeValue = JSON.stringify(parsed);
+      }
+      const formatted = new Date(generatedAt);
+      this.qrGeneratedAtDisplay = !Number.isNaN(formatted.getTime())
+        ? formatted.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          })
+        : null;
+    } catch {
+      this.qrGeneratedAtDisplay = null;
     }
   }
 
