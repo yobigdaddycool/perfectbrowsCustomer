@@ -318,15 +318,23 @@
       </div>
 
       <div class="actions">
-        @if (isEditMode) {
-          <button type="button" class="btn btn-outline" (click)="onRevert()" [disabled]="cameraActive || isLoadingCustomer">
-            Revert Changes
-          </button>
-        } @else {
-          <button type="button" class="btn btn-outline" (click)="onClear()" [disabled]="cameraActive">
+        <button
+          *ngIf="isEditMode; else clearButton"
+          type="button"
+          class="btn btn-outline"
+          (click)="onRevert()"
+          [disabled]="cameraActive || isLoadingCustomer || !isFormDirty">
+          Revert Changes
+        </button>
+        <ng-template #clearButton>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="onClear()"
+            [disabled]="cameraActive">
             Clear
           </button>
-        }
+        </ng-template>
 
         <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer || cameraActive">
           {{ isEditMode ? 'Update Customer' : 'Save Customer' }}
