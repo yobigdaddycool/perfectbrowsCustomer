@@ -318,7 +318,16 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn btn-outline" (click)="onClear()" [disabled]="cameraActive">Clear</button>
+        @if (isEditMode) {
+          <button type="button" class="btn btn-outline" (click)="onRevert()" [disabled]="cameraActive || isLoadingCustomer">
+            Revert Changes
+          </button>
+        } @else {
+          <button type="button" class="btn btn-outline" (click)="onClear()" [disabled]="cameraActive">
+            Clear
+          </button>
+        }
+
         <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer || cameraActive">
           {{ isEditMode ? 'Update Customer' : 'Save Customer' }}
         </button>

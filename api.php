@@ -435,8 +435,12 @@ function getCustomer(&$response) {
         $lastAppointment = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Combine appointment date and time if available
-        if ($lastAppointment && $lastAppointment['appointment_date'] && $lastAppointment['appointment_time']) {
-            $lastAppointment['appointment_datetime'] = $lastAppointment['appointment_date'] . ' ' . $lastAppointment['appointment_time'];
+        if ($lastAppointment && $lastAppointment['appointment_date']) {
+            if ($lastAppointment['appointment_time']) {
+                $lastAppointment['appointment_datetime'] = $lastAppointment['appointment_date'] . ' ' . $lastAppointment['appointment_time'];
+            } else {
+                $lastAppointment['appointment_datetime'] = $lastAppointment['appointment_date'] . ' 00:00:00';
+            }
         }
 
         $customer['last_appointment'] = $lastAppointment;

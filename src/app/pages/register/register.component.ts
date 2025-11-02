@@ -194,11 +194,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
       console.log('📅 Populated appointment - Stylist:', this.customer.stylist, 'Service:', this.customer.service);
 
       // Parse date/time if available
-      if (data.last_appointment.appointment_datetime) {
-        const datetime = new Date(data.last_appointment.appointment_datetime);
-        this.customer.date = datetime.toISOString().split('T')[0];
-        this.customer.time = datetime.toTimeString().slice(0, 5);
-        console.log('📅 Populated date/time - Date:', this.customer.date, 'Time:', this.customer.time);
+      if (data.last_appointment.appointment_datetime || data.last_appointment.appointment_date) {
+        const datetimeString = data.last_appointment.appointment_datetime
+          || `${data.last_appointment.appointment_date}T00:00:00`;
+        const datetime = new Date(datetimeString);
+        if (!Number.isNaN(datetime.getTime())) {
+          this.customer.date = datetime.toISOString().split('T')[0];
+          this.customer.time = datetime.toTimeString().slice(0, 5);
+          console.log('📅 Populated date/time - Date:', this.customer.date, 'Time:', this.customer.time);
+        } else {
+          this.customer.date = data.last_appointment.appointment_date || '';
+          this.customer.time = data.last_appointment.appointment_time || '';
+          console.warn('⚠️ Invalid appointment datetime; using raw values instead');
+        }
+      } else {
+        this.customer.date = '';
+        this.customer.time = '';
       }
     }
 
@@ -527,6 +538,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Reset dirty flag
     this.storeOriginalFormData();
+  }
+
+  onRevert() {
+    if (!this.customerId) {
+      this.onClear();
+      return;
+    }
+
+    if (this.isFormDirty) {
+      const confirmed = confirm('Revert all changes and reload the customer from the server?');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    this.loadCustomerData(this.customerId);
   }
 
   validateForm(): { [key: string]: string } {
