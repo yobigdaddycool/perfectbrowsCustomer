@@ -11,7 +11,7 @@ $env:SSH_ASKPASS_REQUIRE = $null
 $env:DISPLAY = $null
 
 # Start ssh-agent and capture output
-$agentOutput = & "C:\Program Files\Git\usr\-mbin\ssh-agent.exe" 2>&1 | Out-String
+$agentOutput = & "C:\Program Files\Git\usr\bin\ssh-agent.exe" 2>&1 | Out-String
 
 # Parse and set environment variables
 if ($agentOutput -match 'SSH_AUTH_SOCK=([^;]+)') {
@@ -50,7 +50,7 @@ Start-Sleep -Seconds 1
 
 # push MAIN
 git add -A
-git commit -m "huge page update final one"
+git commit -m "huge deployement update"
 git push -u origin main
 
 # build
