@@ -1,4 +1,4 @@
-﻿<div class="wrap">
+ï»¿<div class="wrap">
   <div class="card" role="region" aria-label="Customer Intake">
     <div class="header">
       <div class="brand">
@@ -6,7 +6,7 @@
         <h1>{{ isEditMode ? 'Edit Customer' : 'Register New Customer' }}</h1>
       </div>
       <div class="badges">
-        <span class="chip">{{ isEditMode ? 'Edit Mode' : 'Landing — Register' }}</span>
+        <span class="chip">{{ isEditMode ? 'Edit Mode' : 'Landing - Register' }}</span>
         <span class="chip">Angular App</span>
         <span class="chip">Magenta Theme</span>
       </div>
@@ -90,7 +90,7 @@
                       (change)="validateField('stylist', customer.stylist)"
                       [class.error]="fieldErrors['stylist']"
                       [class.flash-error]="isFlashing('stylist')">
-                <option value="" selected disabled>Select stylist…</option>
+                <option value="" selected disabled>Select stylist...</option>
                 <option>Any Available</option>
                 <option>Anna</option>
                 <option>Layla</option>
@@ -108,7 +108,7 @@
               <select id="visitType" [(ngModel)]="customer.visitType" name="visitType">
                 <option>New</option>
                 <option>Returning</option>
-                <option>Walk‑in</option>
+                <option>Walk-in</option>
               </select>
             </div>
           </div>
@@ -119,7 +119,7 @@
                     (change)="validateField('service', customer.service)"
                     [class.error]="fieldErrors['service']"
                     [class.flash-error]="isFlashing('service')">
-              <option value="" selected disabled>Select a service…</option>
+              <option value="" selected disabled>Select a service...</option>
               <option>Facial</option>
               <option>Lashes</option>
               <option>Threading</option>
@@ -158,13 +158,16 @@
                   Scan this code to access customer information
                 </div>
                 <div style="margin-top: 12px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer || !customerId">
+                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer || !customerId || isPhotoProcessing">
                     Regenerate QR Code
                   </button>
-                  <button type="button" class="btn btn-outline" (click)="removeQrCode()" [disabled]="isLoadingCustomer || !customerId">
+                  <button type="button" class="btn btn-outline" (click)="removeQrCode()" [disabled]="isLoadingCustomer || !customerId || isPhotoProcessing">
                     Remove QR Code
                   </button>
                 </div>
+                @if (qrGeneratedAtDisplay) {
+                  <div class="help" style="margin-top: 8px;">Issued {{ qrGeneratedAtDisplay }}</div>
+                }
               </div>
             } @else if (qrCodeError) {
               <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
@@ -176,7 +179,7 @@
               </div>
               @if (isEditMode && customerId) {
                 <div style="margin-top: 12px; text-align: center;">
-                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer">
+                  <button type="button" class="btn btn-outline" (click)="regenerateQrCode()" [disabled]="isLoadingCustomer || isPhotoProcessing">
                     Generate QR Code
                   </button>
                 </div>
@@ -222,16 +225,23 @@
 
               <!-- Hidden canvas for capturing -->
               <canvas #canvasElement style="display: none;"></canvas>
+
+              @if (isPhotoProcessing) {
+                <div class="processing-overlay" aria-live="polite">
+                  <div class="spinner small"></div>
+                  <span>Saving changes...</span>
+                </div>
+              }
             </div>
 
             <!-- Button states -->
             <div class="row" style="margin-top:10px; gap: 8px;">
               <!-- Initial state buttons -->
-              @if (!cameraActive && !capturedPhoto) {
-                <button type="button" class="btn btn-outline" (click)="openCamera()">
+              @if (!cameraActive && !photoPreview && !capturedPhoto) {
+                <button type="button" class="btn btn-outline" (click)="openCamera()" [disabled]="isPhotoProcessing">
                   Open Camera
                 </button>
-                <button type="button" class="btn btn-outline" (click)="fileInput.click()">
+                <button type="button" class="btn btn-outline" (click)="fileInput.click()" [disabled]="isPhotoProcessing">
                   Upload Photo
                 </button>
                 <input #fileInput type="file" accept="image/*" style="display: none;" (change)="handleFileUpload($event)" />
@@ -239,30 +249,30 @@
 
               <!-- Camera active, no preview yet -->
               @if (cameraActive && !photoPreview) {
-                <button type="button" class="btn btn-primary" (click)="capturePhoto()">
+                <button type="button" class="btn btn-primary" (click)="capturePhoto()" [disabled]="isPhotoProcessing">
                   Capture Photo
                 </button>
-                <button type="button" class="btn btn-outline" (click)="closeCamera()">
+                <button type="button" class="btn btn-outline" (click)="closeCamera()" [disabled]="isPhotoProcessing">
                   Cancel
                 </button>
               }
 
               <!-- Preview state (before confirmation) -->
               @if (photoPreview) {
-                <button type="button" class="btn btn-primary" (click)="usePhoto()">
+                <button type="button" class="btn btn-primary" (click)="usePhoto()" [disabled]="isPhotoProcessing">
                   Use This Photo
                 </button>
-                <button type="button" class="btn btn-outline" (click)="retakePhoto()">
+                <button type="button" class="btn btn-outline" (click)="retakePhoto()" [disabled]="isPhotoProcessing">
                   Retake Photo
                 </button>
               }
 
               <!-- Photo captured (final state) -->
               @if (capturedPhoto && !cameraActive) {
-                <button type="button" class="btn btn-outline" (click)="changePhoto()">
+                <button type="button" class="btn btn-outline" (click)="changePhoto()" [disabled]="isPhotoProcessing">
                   Change Photo
                 </button>
-                <button type="button" class="btn btn-outline" (click)="removePhoto()">
+                <button type="button" class="btn btn-outline" (click)="removePhoto()" [disabled]="isPhotoProcessing">
                   Remove Photo
                 </button>
               }
@@ -282,10 +292,12 @@
                   {{ fieldErrors['date'] }}
                 </div>
               }
+              <div class="help">Date cannot be more than one day in the past.</div>
             </div>
             <div class="field">
               <label for="time">Time</label>
               <input id="time" type="time" [(ngModel)]="customer.time" name="time" />
+              <div class="help">Optional; leave blank if the appointment time is TBD.</div>
             </div>
           </div>
 
@@ -313,6 +325,7 @@
                 <input type="checkbox" [(ngModel)]="customer.emailConsent" name="emailConsent" /> Email updates
               </label>
             </div>
+            <div class="help">Used only for appointment reminders and occasional follow-up updates.</div>
           </div>
         </div>
       </div>
@@ -323,7 +336,7 @@
           type="button"
           class="btn btn-outline"
           (click)="onRevert()"
-          [disabled]="cameraActive || isLoadingCustomer || !isFormDirty">
+          [disabled]="cameraActive || isLoadingCustomer || isPhotoProcessing || !isFormDirty">
           Revert Changes
         </button>
         <ng-template #clearButton>
@@ -331,15 +344,29 @@
             type="button"
             class="btn btn-outline"
             (click)="onClear()"
-            [disabled]="cameraActive">
+            [disabled]="cameraActive || isPhotoProcessing">
             Clear
           </button>
         </ng-template>
 
-        <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer || cameraActive">
+        <button type="submit" class="btn btn-primary" [disabled]="isLoadingCustomer || cameraActive || isPhotoProcessing">
           {{ isEditMode ? 'Update Customer' : 'Save Customer' }}
         </button>
       </div>
+
+      @if (lastErrorDetails) {
+        <div class="error-panel" role="region" aria-live="polite">
+          <div class="error-panel__header">
+            <strong>Debug details</strong>
+            <button type="button" class="btn btn-link" (click)="toggleErrorDetails()">
+              {{ showErrorDetails ? 'Hide Details' : 'View Details' }}
+            </button>
+          </div>
+          @if (showErrorDetails) {
+            <pre class="error-panel__body">{{ lastErrorDetails }}</pre>
+          }
+        </div>
+      }
 
       @if (cameraActive) {
         <div class="info-message" style="text-align: center; color: #ff6b35; margin-top: 10px;">
@@ -365,7 +392,7 @@
             <span>Checking connection...</span>
           }
         </div>
-        <p class="subtle">Angular Application • Full form validation enabled</p>
+        <p class="subtle">Angular Application &bull; Full form validation enabled</p>
       </div>
     </form>
   </div>

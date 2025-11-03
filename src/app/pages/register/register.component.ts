@@ -1,8 +1,8 @@
-﻿import { Component, ViewChild, ElementRef, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, ViewChild, ElementRef, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
 import * as QRCode from 'qrcode';
 
@@ -77,7 +77,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
-    private router: Router,
     public dbConnection: DatabaseConnectionService
   ) {}
 
@@ -108,6 +107,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
         this.isEditMode = true;
         this.customerId = +id; // Convert to number
         console.log('✏️ Edit mode activated for customer ID:', this.customerId);
+        this.lastErrorDetails = null;
+        this.showErrorDetails = false;
         this.loadCustomerData(this.customerId);
 
         // Safety timeout - if loading takes more than 10 seconds, show form anyway
@@ -144,6 +145,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
   loadCustomerData(customerId: number) {
     this.isLoadingCustomer = true;
     this.isPhotoProcessing = false;
+    this.lastErrorDetails = null;
+    this.showErrorDetails = false;
     const url = `${this.apiUrl}?action=get-customer&customerId=${customerId}`;
 
     console.log('🔍 Loading customer data for ID:', customerId);
@@ -153,6 +156,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
       next: (response) => {
         console.log('✅ Customer data received:', response);
         this.isLoadingCustomer = false;
+        this.isPhotoProcessing = false;
+        this.lastErrorDetails = null;
+        this.showErrorDetails = false;
         this.cdr.detectChanges(); // Force change detection for zoneless mode
 
         if (response.success && response.data) {
@@ -173,6 +179,18 @@ export class RegisterComponent implements OnInit, OnDestroy {
           error: error.error
         });
         this.isLoadingCustomer = false;
+        this.isPhotoProcessing = false;
+        this.lastErrorDetails = JSON.stringify(
+          {
+            status: error.status,
+            statusText: error.statusText,
+            message: error.message,
+            error: error.error
+          },
+          null,
+          2
+        );
+        this.showErrorDetails = false;
         this.cdr.detectChanges(); // Force change detection even on error
         this.showToastMessage('Error loading customer data');
       }
@@ -238,7 +256,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     // Render QR code for this customer if one exists
     if (data.qr_code_value) {
       this.qrCodeValue = data.qr_code_value;
-      this.generateQRCode(data.qr_code_value);
+      void this.generateQRCode(data.qr_code_value);
     } else {
       this.qrCodeValue = null;
       this.qrCodeDataUrl = null;
@@ -331,11 +349,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Show loading state
     this.isLoadingCustomer = true;
+    this.isPhotoProcessing = !!createData.photo;
+    this.lastErrorDetails = null;
+    this.showErrorDetails = false;
 
     this.http.post<any>(url, createData).subscribe({
       next: (response) => {
         console.log('✅ Create response:', response);
         this.isLoadingCustomer = false;
+        this.isPhotoProcessing = false;
 
         if (response.success) {
           const customerId = response.data?.customerId;
@@ -356,6 +378,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
 
           this.showToastMessage('Customer Saved Successfully!');
+          this.scrollToTop();
+          this.lastErrorDetails = null;
+          this.showErrorDetails = false;
 
           // Switch into edit mode and reload the customer so form reflects saved data
           if (customerId) {
@@ -368,11 +393,29 @@ export class RegisterComponent implements OnInit, OnDestroy {
         } else {
           this.showToastMessage('Failed to create customer: ' + response.message);
           console.error('❌ Create failed:', response.message);
+          this.lastErrorDetails = JSON.stringify(
+            { message: response.message, debug: response.debug ?? null },
+            null,
+            2
+          );
+          this.showErrorDetails = false;
         }
       },
       error: (error) => {
         console.error('❌ HTTP Error creating customer:', error);
         this.isLoadingCustomer = false;
+        this.isPhotoProcessing = false;
+        this.lastErrorDetails = JSON.stringify(
+          {
+            status: error.status,
+            statusText: error.statusText,
+            message: error.message,
+            error: error.error
+          },
+          null,
+          2
+        );
+        this.showErrorDetails = false;
         this.showToastMessage('Error creating customer. Please try again.');
       }
     });
@@ -438,8 +481,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('📦 Update data:', { ...updateData, photo: updateData.photo ? '[BASE64_DATA]' : undefined });
 
     // Show loading state
-    const originalButtonText = 'Update Customer';
     this.isLoadingCustomer = true;
+    this.isPhotoProcessing = !!updateData.photo || this.shouldDeletePhoto || qrAction === 'regenerate';
+    this.lastErrorDetails = null;
+    this.showErrorDetails = false;
 
     this.http.post<any>(url, updateData).subscribe({
       next: (response) => {
@@ -491,6 +536,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
           this.scrollToTop();
+          this.isPhotoProcessing = false;
+          this.lastErrorDetails = null;
+          this.showErrorDetails = false;
 
           // Reload customer data to ensure UI is in sync with database
           if (this.isEditMode && this.customerId) {
@@ -499,9 +547,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
               this.loadCustomerData(this.customerId!);
             }, 500);
           }
-          this.isPhotoProcessing = false;
-          this.lastErrorDetails = null;
-          this.showErrorDetails = false;
         } else {
           this.isPhotoProcessing = false;
           this.lastErrorDetails = JSON.stringify(
@@ -570,6 +615,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.qrCodeValue = null;
     this.qrCodeError = null;
     this.qrGeneratedAtDisplay = null;
+    this.isPhotoProcessing = false;
+    this.lastErrorDetails = null;
+    this.showErrorDetails = false;
 
     // Reset dirty flag
     this.storeOriginalFormData();
@@ -588,6 +636,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
       }
     }
 
+    this.isPhotoProcessing = false;
+    this.lastErrorDetails = null;
+    this.showErrorDetails = false;
     this.loadCustomerData(this.customerId);
   }
 
@@ -729,19 +780,18 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
   }
 
-  private setQrMeta(qrString: string | null): void {
+  private setQrMeta(qrString: string | null): string | null {
+    this.qrGeneratedAtDisplay = null;
+
     if (!qrString) {
-      this.qrGeneratedAtDisplay = null;
-      return;
+      return null;
     }
 
     try {
-      const parsed = JSON.parse(qrString);
+      const parsed = typeof qrString === 'string' ? JSON.parse(qrString) : qrString;
       const generatedAt = parsed.generatedAt ?? new Date().toISOString();
-      if (!parsed.generatedAt) {
-        parsed.generatedAt = generatedAt;
-        this.qrCodeValue = JSON.stringify(parsed);
-      }
+      parsed.generatedAt = generatedAt;
+
       const formatted = new Date(generatedAt);
       this.qrGeneratedAtDisplay = !Number.isNaN(formatted.getTime())
         ? formatted.toLocaleString(undefined, {
@@ -752,8 +802,21 @@ export class RegisterComponent implements OnInit, OnDestroy {
             minute: '2-digit'
           })
         : null;
+
+      return JSON.stringify(parsed);
     } catch {
       this.qrGeneratedAtDisplay = null;
+      return qrString;
+    }
+  }
+
+  toggleErrorDetails() {
+    this.showErrorDetails = !this.showErrorDetails;
+  }
+
+  private scrollToTop() {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
@@ -1086,10 +1149,11 @@ hideToast() {
         console.log('🔲 QR code data:', qrString);
       }
 
-      this.qrCodeValue = qrString;
+      const normalized = this.setQrMeta(qrString);
+      this.qrCodeValue = normalized ?? qrString;
 
       // Generate QR code as data URL
-      this.qrCodeDataUrl = await QRCode.toDataURL(qrString, {
+      this.qrCodeDataUrl = await QRCode.toDataURL(this.qrCodeValue ?? '', {
         width: 300,
         margin: 2,
         color: {
@@ -1105,6 +1169,7 @@ hideToast() {
       console.error('❌ Error generating QR code:', error);
       this.qrCodeError = 'Failed to generate QR code';
       this.qrCodeDataUrl = null;
+      this.qrGeneratedAtDisplay = null;
     }
   }
 }
