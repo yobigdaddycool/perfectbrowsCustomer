@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # Setup SSH key passphrase automation
 # ============================================
 $sshKeyPassphrase = "Perfect123!"
@@ -26,14 +26,22 @@ Write-Host "Adding SSH key..."
 # Convert Windows path to Unix path for bash
 $sshAuthSockUnix = $env:SSH_AUTH_SOCK -replace '\\', '/' -replace '^([A-Z]):', '/mnt/$1'.ToLower()
 
-# Use expect-style approach with bash heredoc to provide password non-interactively
+# Use SSH_ASKPASS helper to provide password without prompting
 $bashCommand = @"
 export SSH_AUTH_SOCK='$sshAuthSockUnix'
 export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'
-export SSH_ASKPASS_REQUIRE=never
-cat <<EOF | ssh-add ~/.ssh/id_rsa
-$sshKeyPassphrase
+export SSH_ASKPASS_REQUIRE=force
+export DISPLAY='askpass:0'
+export SSH_ASKPASS='/tmp/ssh-pass-helper'
+cat <<'EOF' > /tmp/ssh-pass-helper
+#!/bin/sh
+printf '%s\n' '$sshKeyPassphrase'
 EOF
+chmod +x /tmp/ssh-pass-helper
+ssh-add ~/.ssh/id_rsa < /dev/null
+result=$?
+rm -f /tmp/ssh-pass-helper
+exit $result
 "@
 
 $output = & "C:\Program Files\Git\bin\bash.exe" -c $bashCommand 2>&1
@@ -48,13 +56,17 @@ Write-Host "Keys loaded: $(if ($keyList -match 'SHA256') { '1 key(s)' } else { '
 
 Start-Sleep -Seconds 1
 
+# build
+ng build --configuration production
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Angular build failed. Aborting deployment."
+    exit $LASTEXITCODE
+}
+
 # push MAIN
 git add -A
 git commit -m "huge deployement update"
 git push -u origin main
-
-# build
-ng build --configuration production
 
 # publish DEPLOY (worktree)
 git fetch origin
@@ -100,6 +112,18 @@ cd .deploy_publish
 git add -A
 git commit -m "deploy: camera button update"
 git push -u origin deploy
+# Optional: Pull latest to Bluehost now?
+try {
+  $reply = Read-Host 'Pull latest on Bluehost now? (y/N)'
+  if ($reply -match '^(y|yes)$') {
+    $ssh = 'C:\\Program Files\\Git\\usr\\bin\\ssh.exe'
+    $remote = 'ichrqhmy@ich.rqh.mybluehost.me'
+    $remoteCmd = "cd public_html/website_2eb58030 && git pull --ff-only origin"
+    & $ssh -A $remote $remoteCmd
+  }
+} catch {
+  Write-Warning "Remote pull step failed: $($_.Exception.Message)"
+}
 cd ..
 git worktree remove .deploy_publish -f 2>$null
 
@@ -111,3 +135,4 @@ if ($env:SSH_AGENT_PID) {
     & "C:\Program Files\Git\usr\bin\ssh-agent.exe" -k 2>&1 | Out-Null
 }
 Write-Host "Deployment complete!"
+
