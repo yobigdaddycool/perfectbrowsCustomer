@@ -390,16 +390,47 @@ export class ScanComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // ===== STEP 1: DEBUG - Just log what we got from QR code =====
+    // ===== STEP 1: DEBUG - Log and parse QR code =====
     console.log('🎯 ===== QR CODE DETECTED =====');
     console.log('📦 Raw Payload:', payload);
     console.log('📏 Payload Length:', payload.length);
     console.log('🔤 Payload Type:', typeof payload);
+
+    // Try to parse as JSON and extract customer ID
+    let customerId: string | null = null;
+    let parsedData: any = null;
+    let parseError: string | null = null;
+
+    try {
+      parsedData = JSON.parse(payload);
+      customerId = parsedData.customerId || parsedData.customer_id || null;
+      console.log('✅ Successfully parsed JSON');
+      console.log('🆔 Customer ID:', customerId);
+      console.log('📋 Parsed Data:', parsedData);
+    } catch (e) {
+      parseError = 'Not JSON format';
+      console.warn('⚠️ Failed to parse as JSON:', e);
+      console.log('📝 Treating as plain text');
+    }
+
     console.log('===============================');
 
-    // Show success message
-    this.scanStatusMessage = `QR Code Read: ${payload.substring(0, 50)}${payload.length > 50 ? '...' : ''}`;
-    this.showToastMessage(`QR Code detected! Check console for details.`);
+    // Build display message for screen (visible on phone!)
+    let displayMessage = `RAW PAYLOAD:\n${payload}\n\n`;
+
+    if (parseError) {
+      displayMessage += `⚠️ ${parseError}\n`;
+    } else if (parsedData) {
+      displayMessage += `✅ PARSED JSON:\n`;
+      displayMessage += `Customer ID: ${customerId || 'NOT FOUND'}\n`;
+      if (parsedData.firstName) displayMessage += `Name: ${parsedData.firstName} ${parsedData.lastName || ''}\n`;
+      if (parsedData.phone) displayMessage += `Phone: ${parsedData.phone}\n`;
+      if (parsedData.generatedAt) displayMessage += `Generated: ${parsedData.generatedAt}\n`;
+    }
+
+    // Show on screen
+    this.scanStatusMessage = displayMessage;
+    this.showToastMessage(`QR Code Detected! Customer ID: ${customerId || 'Unknown'}`);
     this.isProcessingScan = false;
     this.cdr.markForCheck();
 
