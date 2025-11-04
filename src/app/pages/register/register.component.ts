@@ -71,6 +71,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
   lastErrorDetails: string | null = null;
   showErrorDetails = false;
 
+  // Read-only mode for inactive customers
+  isReadOnlyMode = false;
+  readOnlyStatusLabel: string | null = null;
+  readOnlyBannerMessage: string | null = null;
+
+  private readonly inactiveCustomerMessage =
+    'This customer profile is inactive. To continue, create a new registration or contact a manager to reactivate the record.';
+  private pendingInactiveFromNavigation = false;
+
   // API URL - must use Bluehost URL (database only accessible from Bluehost server)
   private apiUrl = 'https://website-2eb58030.ich.rqh.mybluehost.me/api.php';
 
@@ -97,6 +106,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('🚀 RegisterComponent initialized');
 
     this.consumeScanResultMessage();
+    this.initializeReadOnlyFromNavigation();
 
     // Set minimum date to yesterday (one day in the past)
     const yesterday = new Date();
@@ -218,6 +228,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   populateCustomerData(data: any) {
+    const rawIsActive = data.is_active;
+    const isActive =
+      rawIsActive === undefined
+        ? true
+        : rawIsActive === 1 || rawIsActive === '1' || rawIsActive === true;
+    const statusLabel = data.status ?? (isActive ? 'active' : 'inactive');
+    this.setReadOnlyState(!isActive, statusLabel);
+
     // Populate basic customer info
     this.customer.firstName = data.first_name || '';
     this.customer.lastName = data.last_name || '';
@@ -306,6 +324,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   // Check if form has been modified
   checkFormDirty() {
+    if (this.isReadOnlyMode) {
+      this.isFormDirty = false;
+      return;
+    }
+
     const currentFormData = JSON.stringify({
       ...this.customer,
       photo: this.capturedPhoto
@@ -315,6 +338,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   async onSubmit() {
+    if (!this.ensureEditable('form submission')) {
+      return;
+    }
+
     this.fieldErrors = {};
     const errors = this.validateForm();
 
@@ -344,6 +371,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   createCustomer() {
+    if (!this.ensureEditable('create customer')) {
+      return;
+    }
+
     console.log('💾 Creating new customer:', this.customer);
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
 
@@ -449,6 +480,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   updateCustomer(qrAction?: 'regenerate' | 'delete') {
+    if (!this.ensureEditable('update customer')) {
+      return;
+    }
+
     console.log('💾 Updating customer ID:', this.customerId);
     console.log('📋 Current customer data:', this.customer);
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
@@ -612,6 +647,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   onClear(skipConfirm: boolean = false) {
+    if (!this.ensureEditable('clear form')) {
+      return;
+    }
+
     // Warn if there are unsaved changes
     if (!skipConfirm && this.isFormDirty) {
       if (!confirm('You have unsaved changes. Are you sure you want to clear the form?')) {
@@ -919,6 +958,56 @@ export class RegisterComponent implements OnInit, OnDestroy {
     return !isNaN(numPrice) && numPrice > 0;
   }
 
+  private initializeReadOnlyFromNavigation() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const navState = window.history?.state as { isInactive?: boolean; statusLabel?: string } | undefined;
+    if (navState?.isInactive === true) {
+      this.pendingInactiveFromNavigation = true;
+      this.setReadOnlyState(true, navState.statusLabel ?? 'inactive');
+    }
+  }
+
+  private setReadOnlyState(isReadOnly: boolean, statusLabel?: string | null) {
+    const normalizedLabel = isReadOnly ? statusLabel ?? 'inactive' : null;
+
+    if (
+      this.isReadOnlyMode === isReadOnly &&
+      (this.readOnlyStatusLabel ?? null) === (normalizedLabel ?? null)
+    ) {
+      return;
+    }
+
+    this.isReadOnlyMode = isReadOnly;
+    this.readOnlyStatusLabel = normalizedLabel;
+    this.readOnlyBannerMessage = isReadOnly ? this.inactiveCustomerMessage : null;
+
+    if (isReadOnly) {
+      this.pendingInactiveFromNavigation = false;
+      this.stopCamera();
+      this.cameraActive = false;
+      this.photoPreview = null;
+      this.isFormDirty = false;
+      this.fieldErrors = {};
+      this.flashingFields.clear();
+      this.shouldDeletePhoto = false;
+    } else {
+      this.pendingInactiveFromNavigation = false;
+    }
+  }
+
+  private ensureEditable(context: string): boolean {
+    if (!this.isReadOnlyMode) {
+      return true;
+    }
+
+    console.warn(`✋ Action blocked (${context}) - customer record is inactive.`);
+    this.showToastMessage(this.inactiveCustomerMessage);
+    return false;
+  }
+
   private showToastMessage(message: string) {
     console.log('🍞 Showing toast message:', message);
     this.toastMessage = message;
@@ -943,6 +1032,10 @@ hideToast() {
   // Camera Methods
 
   async openCamera() {
+    if (!this.ensureEditable('camera access')) {
+      return;
+    }
+
     this.cameraError = null;
 
     // Set cameraActive FIRST to render the video element
@@ -975,12 +1068,24 @@ hideToast() {
   private consumeScanResultMessage() {
     const scanResult = this.scanResults.consumeResult();
 
-    if (!scanResult || scanResult.status !== 'found') {
+    if (!scanResult) {
       return;
     }
 
-    const message = scanResult.message || 'Customer loaded from QR scan.';
-    this.showToastMessage(message);
+    if (scanResult.status === 'found') {
+      const message = scanResult.message || 'Customer loaded from QR scan.';
+      this.showToastMessage(message);
+
+      if (scanResult.isInactive) {
+        this.setReadOnlyState(true, scanResult.statusLabel ?? 'inactive');
+      }
+
+      return;
+    }
+
+    if (scanResult.status === 'not-found' && scanResult.message) {
+      this.showToastMessage(scanResult.message);
+    }
   }
 
   private async getPreferredCameraStream(preference: 'environment' | 'user'): Promise<MediaStream> {
@@ -1057,6 +1162,10 @@ hideToast() {
   }
 
   async toggleCameraFacing() {
+    if (!this.ensureEditable('camera switch')) {
+      return;
+    }
+
     if (this.isSwitchingCamera) {
       return;
     }
@@ -1092,6 +1201,10 @@ hideToast() {
   }
 
   capturePhoto() {
+    if (!this.ensureEditable('photo capture')) {
+      return;
+    }
+
     if (!this.videoElement || !this.canvasElement) return;
 
     const video = this.videoElement.nativeElement;
@@ -1112,6 +1225,10 @@ hideToast() {
   }
 
   usePhoto() {
+    if (!this.ensureEditable('photo confirmation')) {
+      return;
+    }
+
     console.log('📸 Using captured photo');
     console.log('📸 Photo preview length:', this.photoPreview?.length);
     this.capturedPhoto = this.photoPreview;
@@ -1124,16 +1241,28 @@ hideToast() {
   }
 
   retakePhoto() {
+    if (!this.ensureEditable('photo retake')) {
+      return;
+    }
+
     this.photoPreview = null;
     // Restart video playback using the same method
     this.startVideoPlayback();
   }
 
   changePhoto() {
+    if (!this.ensureEditable('photo change')) {
+      return;
+    }
+
     this.openCamera();
   }
 
   removePhoto() {
+    if (!this.ensureEditable('photo removal')) {
+      return;
+    }
+
     console.log('🗑️ Remove photo clicked');
     this.capturedPhoto = null;
     this.photoPreview = null;
@@ -1157,6 +1286,10 @@ hideToast() {
   }
 
   handleFileUpload(event: Event) {
+    if (!this.ensureEditable('photo upload')) {
+      return;
+    }
+
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
@@ -1216,6 +1349,10 @@ hideToast() {
   // QR Code Methods
 
   regenerateQrCode() {
+    if (!this.ensureEditable('QR code regenerate')) {
+      return;
+    }
+
     if (!this.customerId) {
       this.showToastMessage('Please save the customer before generating a QR code.');
       return;
@@ -1231,6 +1368,10 @@ hideToast() {
   }
 
   removeQrCode() {
+    if (!this.ensureEditable('QR code removal')) {
+      return;
+    }
+
     if (!this.customerId) {
       return;
     }

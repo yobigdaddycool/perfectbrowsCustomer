@@ -198,6 +198,7 @@ function searchCustomers(&$response) {
             c.last_name,
             c.phone,
             c.email,
+            c.is_active,
             MAX(cp.file_path) as profile_photo,
             MAX(a.appointment_date) as last_visit,
             COUNT(DISTINCT a.appointment_id) as total_visits,
@@ -267,6 +268,11 @@ function searchCustomers(&$response) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $results = array_map(function ($row) {
+            $row['is_active'] = (int)($row['is_active'] ?? 1);
+            $row['status'] = $row['is_active'] === 1 ? 'active' : 'inactive';
+            return $row;
+        }, $results);
 
         $response['success'] = true;
         $response['message'] = "Search completed successfully";
@@ -380,6 +386,7 @@ function getCustomer(&$response) {
                 c.email,
                 c.sms_consent,
                 c.email_consent,
+                c.is_active,
                 c.created_at,
                 cp.file_path as profile_photo
             FROM customers c
@@ -397,6 +404,9 @@ function getCustomer(&$response) {
             $response['debug'][] = "Customer ID $customerId does not exist";
             return;
         }
+
+        $customer['is_active'] = (int)($customer['is_active'] ?? 1);
+        $customer['status'] = $customer['is_active'] === 1 ? 'active' : 'inactive';
 
         // Get active QR code value if available
         $qrSql = "SELECT qr_code_value
@@ -508,14 +518,24 @@ function updateCustomer(&$response) {
         }
 
         // Check if customer exists
-        $checkSql = "SELECT customer_id FROM customers WHERE customer_id = :customerId";
+        $checkSql = "SELECT customer_id, is_active FROM customers WHERE customer_id = :customerId";
         $checkStmt = $pdo->prepare($checkSql);
         $checkStmt->execute([':customerId' => $customerId]);
 
-        if (!$checkStmt->fetch()) {
+        $existingCustomer = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existingCustomer) {
             $response['success'] = false;
             $response['message'] = "Customer not found";
             $response['error'] = "No customer with ID: $customerId";
+            return;
+        }
+
+        if ((int)$existingCustomer['is_active'] !== 1) {
+            $response['success'] = false;
+            $response['message'] = "Inactive customers cannot be modified";
+            $response['error'] = "CUSTOMER_INACTIVE";
+            $response['debug'][] = "Update blocked: customer $customerId is inactive";
             return;
         }
 
@@ -1135,7 +1155,7 @@ function scanQRCode(&$response) {
         $row = null;
 
         if ($normalizedPayload) {
-            $lookupSql = "SELECT c.customer_id, c.first_name, c.last_name, q.created_at
+            $lookupSql = "SELECT c.customer_id, c.first_name, c.last_name, c.is_active, q.created_at
                           FROM customer_qr_codes q
                           INNER JOIN customers c ON c.customer_id = q.customer_id
                           WHERE q.is_active = 1 AND q.qr_code_value = :qrValue
@@ -1153,7 +1173,7 @@ function scanQRCode(&$response) {
 
         if (!$row && $customerId) {
             $matchType = 'customer-id';
-            $fallbackSql = "SELECT c.customer_id, c.first_name, c.last_name, q.created_at
+            $fallbackSql = "SELECT c.customer_id, c.first_name, c.last_name, c.is_active, q.created_at
                             FROM customers c
                             LEFT JOIN customer_qr_codes q ON q.customer_id = c.customer_id AND q.is_active = 1
                             WHERE c.customer_id = :customerId
@@ -1174,16 +1194,19 @@ function scanQRCode(&$response) {
         }
 
         $fullName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+        $isActive = (int)($row['is_active'] ?? 1) === 1;
 
         $response['success'] = true;
         $response['message'] = $fullName
-            ? "Found customer: $fullName"
-            : "Customer located via QR scan";
+            ? ($isActive ? "Found customer: $fullName" : "Found inactive customer: $fullName")
+            : ($isActive ? "Customer located via QR scan" : "Inactive customer located via QR scan");
         $response['data'] = [
             'customerId' => (int)$row['customer_id'],
             'fullName' => $fullName,
             'matchType' => $matchType,
-            'qrGeneratedAt' => $decodedPayload['generatedAt'] ?? ($row['created_at'] ?? null)
+            'qrGeneratedAt' => $decodedPayload['generatedAt'] ?? ($row['created_at'] ?? null),
+            'isActive' => $isActive,
+            'status' => $isActive ? 'active' : 'inactive'
         ];
         $response['debug'][] = "✅ scan-qr: Customer matched with ID " . $row['customer_id'];
 

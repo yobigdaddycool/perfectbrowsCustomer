@@ -7,6 +7,8 @@ export interface ScanResultPayload {
   message: string;
   customerId?: number;
   rawPayload?: string;
+  statusLabel?: string;
+  isInactive?: boolean;
 }
 
 @Injectable({
@@ -33,4 +35,3 @@ export class ScanResultService {
     this.pendingResult = null;
   }
 }
-

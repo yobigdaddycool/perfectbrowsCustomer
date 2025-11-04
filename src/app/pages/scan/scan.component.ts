@@ -41,6 +41,8 @@ interface ScanApiResponse {
     fullName?: string;
     matchType?: string;
     qrGeneratedAt?: string | null;
+    isActive?: boolean;
+    status?: string;
   } | null;
   debug?: unknown;
 }
@@ -538,9 +540,19 @@ export class ScanComponent implements OnInit, OnDestroy {
     if (response.success && response.data?.customerId) {
       const customerId = Number(response.data.customerId);
       const customerName = response.data.fullName;
+      const isActive = response.data?.isActive !== false;
+      const statusLabel = response.data?.status ?? (isActive ? 'active' : 'inactive');
+      const isInactive = !isActive;
 
-      const successMessage =
-        response.message ?? (customerName ? `Found ${customerName}!` : 'Customer found!');
+      const defaultMessage = customerName
+        ? isInactive
+          ? `Found inactive customer: ${customerName}`
+          : `Found ${customerName}!`
+        : isInactive
+        ? 'Inactive customer found.'
+        : 'Customer found!';
+
+      const successMessage = response.message ?? defaultMessage;
 
       this.scanStatusMessage = successMessage;
       this.toastMessage = successMessage;
@@ -549,14 +561,16 @@ export class ScanComponent implements OnInit, OnDestroy {
         status: 'found',
         message: successMessage,
         customerId,
-        rawPayload: payload
+        rawPayload: payload,
+        statusLabel,
+        isInactive
       });
       this.cdr.markForCheck();
 
       // Navigate to register component in edit mode
       console.log('🚀 Navigating to register component for customer ID:', customerId);
       this.navigationSub = timer(500).subscribe(() => {
-        this.router.navigate(['/register', customerId], { state: { source: 'scan' } }).catch(err => {
+        this.router.navigate(['/register', customerId], { state: { source: 'scan', isInactive, statusLabel } }).catch(err => {
           console.error('❌ Navigation error:', err);
           this.scanError = 'Unable to open customer profile.';
           this.scanResults.setResult({
