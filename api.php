@@ -1074,4 +1074,129 @@ function createCustomer(&$response) {
         $response['debug'][] = "❌ Exception: " . $e->getMessage();
     }
 }
+
+function scanQRCode(&$response) {
+    global $pdo;
+
+    try {
+        $rawBody = file_get_contents('php://input');
+        $decodedBody = json_decode($rawBody, true);
+
+        if (!is_array($decodedBody)) {
+            $decodedBody = $_POST;
+        }
+
+        $payload = $decodedBody['payload'] ?? ($_POST['payload'] ?? $_GET['payload'] ?? '');
+
+        if (is_array($payload)) {
+            $payload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+
+        $payload = trim((string)$payload);
+
+        if ($payload === '') {
+            $response['success'] = false;
+            $response['message'] = "QR payload is required";
+            $response['error'] = "MISSING_QR_PAYLOAD";
+            $response['debug'][] = "❌ scan-qr: Missing payload";
+            return;
+        }
+
+        $response['debug'][] = "🔍 scan-qr payload sample: " . substr($payload, 0, 200);
+
+        $decodedPayload = json_decode($payload, true);
+
+        if (!is_array($decodedPayload)) {
+            $base64Decoded = base64_decode($payload, true);
+            if ($base64Decoded !== false) {
+                $decodedPayload = json_decode($base64Decoded, true);
+                if (is_array($decodedPayload)) {
+                    $payload = json_encode($decodedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                    $response['debug'][] = "🔁 Payload converted from base64";
+                }
+            }
+        }
+
+        if (!is_array($decodedPayload)) {
+            $response['success'] = false;
+            $response['message'] = "QR payload could not be parsed";
+            $response['error'] = "INVALID_QR_PAYLOAD";
+            $response['debug'][] = "❌ scan-qr: Invalid JSON payload";
+            return;
+        }
+
+        $normalizedPayload = json_encode($decodedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $customerId = $decodedPayload['customerId'] ?? $decodedPayload['customer_id'] ?? null;
+
+        $response['debug'][] = "🔎 Normalized payload: " . $normalizedPayload;
+        $response['debug'][] = "🆔 Customer ID from payload: " . ($customerId ?? 'none');
+
+        $matchType = 'qr-code';
+        $row = null;
+
+        if ($normalizedPayload) {
+            $lookupSql = "SELECT c.customer_id, c.first_name, c.last_name, q.created_at
+                          FROM customer_qr_codes q
+                          INNER JOIN customers c ON c.customer_id = q.customer_id
+                          WHERE q.is_active = 1 AND q.qr_code_value = :qrValue
+                          ORDER BY q.qr_code_id DESC
+                          LIMIT 1";
+
+            $stmt = $pdo->prepare($lookupSql);
+            $stmt->execute([':qrValue' => $normalizedPayload]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                $response['debug'][] = "⚠️ No match found for QR value. Falling back to customer ID.";
+            }
+        }
+
+        if (!$row && $customerId) {
+            $matchType = 'customer-id';
+            $fallbackSql = "SELECT c.customer_id, c.first_name, c.last_name, q.created_at
+                            FROM customers c
+                            LEFT JOIN customer_qr_codes q ON q.customer_id = c.customer_id AND q.is_active = 1
+                            WHERE c.customer_id = :customerId
+                            ORDER BY q.qr_code_id DESC
+                            LIMIT 1";
+
+            $stmt = $pdo->prepare($fallbackSql);
+            $stmt->execute([':customerId' => $customerId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$row) {
+            $response['success'] = false;
+            $response['message'] = "Customer not found for scanned QR code";
+            $response['error'] = "QR_CUSTOMER_NOT_FOUND";
+            $response['debug'][] = "❌ scan-qr: No customer located for payload.";
+            return;
+        }
+
+        $fullName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+
+        $response['success'] = true;
+        $response['message'] = $fullName
+            ? "Found customer: $fullName"
+            : "Customer located via QR scan";
+        $response['data'] = [
+            'customerId' => (int)$row['customer_id'],
+            'fullName' => $fullName,
+            'matchType' => $matchType,
+            'qrGeneratedAt' => $decodedPayload['generatedAt'] ?? ($row['created_at'] ?? null)
+        ];
+        $response['debug'][] = "✅ scan-qr: Customer matched with ID " . $row['customer_id'];
+
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to look up QR code";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ scan-qr PDO Exception: " . $e->getMessage();
+    } catch (Exception $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to process QR code";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ scan-qr Exception: " . $e->getMessage();
+    }
+}
 ?>
