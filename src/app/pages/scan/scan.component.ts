@@ -22,8 +22,14 @@ declare global {
   }
 }
 
+interface DetectedBarcode {
+  rawValue: string;
+  boundingBox?: DOMRectReadOnly;
+  cornerPoints?: Array<{ x: number; y: number }>;
+}
+
 interface BarcodeDetector {
-  detect(image: ImageBitmapSource): Promise<Array<{ rawValue: string }>>;
+  detect(image: ImageBitmapSource): Promise<Array<DetectedBarcode>>;
 }
 
 interface ScanApiResponse {
@@ -70,6 +76,12 @@ export class ScanComponent implements OnInit, OnDestroy {
   private barcodeDetector: BarcodeDetector | null = null;
   private zxingReader: BrowserMultiFormatReader | null = null;
 
+  // Continuous scanning
+  private scanningActive = false;
+  private animationFrameId: number | null = null;
+  private lastDetectedPayload: string | null = null;
+  private detectionCooldown = false;
+
   constructor(
     private readonly http: HttpClient,
     private readonly router: Router,
@@ -94,6 +106,7 @@ export class ScanComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.navigationSub?.unsubscribe();
+    this.stopContinuousScanning();
     this.closeCamera();
   }
 
@@ -126,7 +139,10 @@ export class ScanComponent implements OnInit, OnDestroy {
       }
 
       await this.refreshDeviceList(stream);
-      this.scanStatusMessage = 'Camera ready. Position QR code and tap Scan Now.';
+      this.scanStatusMessage = 'Camera ready. Position QR code in the frame.';
+
+      // Start continuous scanning
+      this.startContinuousScanning();
     } catch (error) {
       console.error('❌ Failed to open camera:', error);
       this.cameraError = this.describeCameraError(error);
@@ -143,6 +159,7 @@ export class ScanComponent implements OnInit, OnDestroy {
     this.scanStatusMessage = '';
     this.scanError = null;
     this.isProcessingScan = false;
+    this.stopContinuousScanning();
     this.stopCamera();
     this.cdr.markForCheck();
   }
@@ -193,6 +210,7 @@ export class ScanComponent implements OnInit, OnDestroy {
     }
 
     this.scanStatusMessage = 'Switching camera...';
+    this.stopContinuousScanning();
     this.cdr.markForCheck();
 
     try {
@@ -209,7 +227,10 @@ export class ScanComponent implements OnInit, OnDestroy {
       }
 
       await this.refreshDeviceList(stream);
-      this.scanStatusMessage = 'Camera ready. Position QR code and tap Scan Now.';
+      this.scanStatusMessage = 'Camera ready. Position QR code in the frame.';
+
+      // Restart continuous scanning
+      this.startContinuousScanning();
     } catch (error) {
       console.error('❌ Failed to switch camera:', error);
       this.cameraError = this.describeCameraError(error);
@@ -506,6 +527,124 @@ export class ScanComponent implements OnInit, OnDestroy {
     });
     this.isProcessingScan = false;
     this.cdr.markForCheck();
+  }
+
+  private startContinuousScanning(): void {
+    if (this.scanningActive) {
+      return;
+    }
+
+    this.scanningActive = true;
+    this.lastDetectedPayload = null;
+    this.detectionCooldown = false;
+    this.scanFrame();
+  }
+
+  private stopContinuousScanning(): void {
+    this.scanningActive = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    // Clear the canvas overlay
+    const canvas = this.canvasElement?.nativeElement;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  private async scanFrame(): Promise<void> {
+    if (!this.scanningActive || !this.cameraActive) {
+      return;
+    }
+
+    const video = this.videoElement?.nativeElement;
+    const canvas = this.canvasElement?.nativeElement;
+
+    if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      // Not ready yet, try again next frame
+      this.animationFrameId = requestAnimationFrame(() => this.scanFrame());
+      return;
+    }
+
+    // Set canvas size to match video
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      this.animationFrameId = requestAnimationFrame(() => this.scanFrame());
+      return;
+    }
+
+    // Clear previous drawings
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    try {
+      // Try to detect QR code with BarcodeDetector (preferred - gives bounding box)
+      if (this.barcodeDetector) {
+        const results = await this.barcodeDetector.detect(video);
+
+        if (results.length > 0) {
+          const barcode = results[0];
+          const payload = barcode.rawValue?.trim();
+
+          // Draw detection box
+          this.drawDetectionBox(ctx, barcode);
+
+          // Process if not in cooldown and payload is different
+          if (payload && !this.detectionCooldown && payload !== this.lastDetectedPayload) {
+            this.lastDetectedPayload = payload;
+            this.detectionCooldown = true;
+            await this.handleDetectedPayload(payload);
+
+            // Reset cooldown after 3 seconds
+            setTimeout(() => {
+              this.detectionCooldown = false;
+              this.lastDetectedPayload = null;
+            }, 3000);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Frame scan error:', error);
+    }
+
+    // Continue scanning
+    this.animationFrameId = requestAnimationFrame(() => this.scanFrame());
+  }
+
+  private drawDetectionBox(ctx: CanvasRenderingContext2D, barcode: DetectedBarcode): void {
+    const box = barcode.boundingBox;
+    const corners = barcode.cornerPoints;
+
+    if (corners && corners.length === 4) {
+      // Draw polygon around QR code using corner points
+      ctx.strokeStyle = '#00ff00'; // Green color
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i++) {
+        ctx.lineTo(corners[i].x, corners[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Add semi-transparent fill
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+      ctx.fill();
+    } else if (box) {
+      // Fallback to bounding box rectangle
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(box.x, box.y, box.width, box.height);
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+      ctx.fillRect(box.x, box.y, box.width, box.height);
+    }
   }
 
   private stopCamera(): void {

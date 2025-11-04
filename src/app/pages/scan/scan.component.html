@@ -1,14 +1,11 @@
 <div class="scan-wrapper">
   <header class="scan-header">
     <h2>QR Scanner</h2>
-    <p>Align the customer&apos;s QR code in the camera view, then tap Scan Now to read it.</p>
+    <p>Align the customer&apos;s QR code in the camera view. Detection is automatic.</p>
   </header>
 
   <div class="scan-controls">
     @if (cameraActive) {
-      <button type="button" class="btn-primary" (click)="scanNow()" [disabled]="isProcessingScan">
-        Scan Now
-      </button>
       <button type="button" class="btn-outline stop" (click)="closeCamera()">Close Camera</button>
     }
   </div>
@@ -23,7 +20,7 @@
   @if (cameraActive) {
     <div class="scanner-frame" [class.processing]="isProcessingScan">
       <video #videoElement autoplay playsinline muted class="camera-video"></video>
-      <canvas #canvasElement hidden></canvas>
+      <canvas #canvasElement class="detection-overlay"></canvas>
 
       <button
         type="button"
