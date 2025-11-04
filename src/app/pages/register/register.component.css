@@ -269,6 +269,7 @@ input.flash-error, select.flash-error, textarea.flash-error {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .camera-video {
@@ -276,6 +277,39 @@ input.flash-error, select.flash-error, textarea.flash-error {
   height: auto;
   border-radius: 6px;
   background: #000;
+}
+
+.camera-toggle-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(17, 24, 39, 0.7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.camera-toggle-btn:hover {
+  transform: scale(1.05);
+  background: rgba(17, 24, 39, 0.85);
+}
+
+.camera-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+.camera-toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .photo-preview,

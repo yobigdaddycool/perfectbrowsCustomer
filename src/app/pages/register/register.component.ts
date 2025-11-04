@@ -55,6 +55,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
   cameraError: string | null = null;
   photoFileName: string | null = null;
   shouldDeletePhoto = false; // Flag to track if photo should be deleted on update
+  preferredFacingMode: 'environment' | 'user' = 'environment';
+  activeFacingMode: 'environment' | 'user' = 'environment';
+  isSwitchingCamera = false;
 
   // QR Code properties
   qrCodeDataUrl: string | null = null;
@@ -933,7 +936,9 @@ hideToast() {
 
     try {
       // Now request camera access after video element is rendered
-      this.stream = await this.getPreferredCameraStream();
+      this.stopCamera();
+      this.stream = await this.getPreferredCameraStream(this.preferredFacingMode);
+      this.preferredFacingMode = this.activeFacingMode;
       // Wait for Angular to render the video element, then start playback
       this.startVideoPlayback();
     } catch (error: any) {
@@ -950,42 +955,53 @@ hideToast() {
     }
   }
 
-  private async getPreferredCameraStream(): Promise<MediaStream> {
+  private async getPreferredCameraStream(preference: 'environment' | 'user'): Promise<MediaStream> {
     const baseVideoSettings: MediaTrackConstraints = {
       width: { ideal: 1280 },
       height: { ideal: 720 }
     };
 
-    const fallbackReasons = new Set(['OverconstrainedError', 'NotFoundError']);
+    const fallbackReasons = new Set(['OverconstrainedError', 'NotFoundError', 'NotReadableError', 'ConstraintNotSatisfiedError']);
 
-    const attempts: MediaTrackConstraints['facingMode'][] = [
-      { exact: 'environment' },
-      { ideal: 'environment' }
-    ];
+    const attemptQueue =
+      preference === 'environment'
+        ? [
+            { constraint: { exact: 'environment' } as MediaTrackConstraints['facingMode'], mode: 'environment' as const },
+            { constraint: { ideal: 'environment' } as MediaTrackConstraints['facingMode'], mode: 'environment' as const },
+            { constraint: 'user' as MediaTrackConstraints['facingMode'], mode: 'user' as const }
+          ]
+        : [
+            { constraint: { exact: 'user' } as MediaTrackConstraints['facingMode'], mode: 'user' as const },
+            { constraint: 'user' as MediaTrackConstraints['facingMode'], mode: 'user' as const },
+            { constraint: { ideal: 'environment' } as MediaTrackConstraints['facingMode'], mode: 'environment' as const }
+          ];
 
-    for (const facingMode of attempts) {
+    let lastError: any = null;
+
+    for (const attempt of attemptQueue) {
       try {
-        return await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             ...baseVideoSettings,
-            facingMode
+            facingMode: attempt.constraint
           }
         });
+        this.activeFacingMode = attempt.mode;
+        return stream;
       } catch (error: any) {
+        lastError = error;
         if (!error || !fallbackReasons.has(error.name)) {
           throw error;
         }
-        console.warn('Preferred camera constraint failed, trying next option:', error);
+        console.warn(`Camera constraint for ${attempt.mode} failed, trying next option`, error);
       }
     }
 
-    console.warn('Falling back to front camera');
-    return navigator.mediaDevices.getUserMedia({
-      video: {
-        ...baseVideoSettings,
-        facingMode: 'user'
-      }
-    });
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error('Unable to acquire camera stream');
   }
 
   private startVideoPlayback(retryCount = 0) {
@@ -1010,6 +1026,41 @@ hideToast() {
         this.showToastMessage(this.cameraError);
       }
     }, 100);
+  }
+
+  async toggleCameraFacing() {
+    if (this.isSwitchingCamera) {
+      return;
+    }
+
+    const previousFacing = this.activeFacingMode;
+    const desiredFacing = this.activeFacingMode === 'environment' ? 'user' : 'environment';
+
+    this.isSwitchingCamera = true;
+    this.cameraError = null;
+
+    try {
+      this.stopCamera();
+      this.stream = await this.getPreferredCameraStream(desiredFacing);
+      this.preferredFacingMode = this.activeFacingMode;
+      this.startVideoPlayback();
+      console.log('Camera switched to:', this.activeFacingMode);
+    } catch (error) {
+      console.error('Error switching camera:', error);
+      this.cameraError = 'Unable to switch camera.';
+      this.showToastMessage(this.cameraError);
+      try {
+        this.stream = await this.getPreferredCameraStream(previousFacing);
+        this.preferredFacingMode = this.activeFacingMode;
+        this.startVideoPlayback();
+      } catch (retryError) {
+        console.error('Failed to recover previous camera after switch error:', retryError);
+        this.closeCamera();
+      }
+    } finally {
+      this.isSwitchingCamera = false;
+      this.cdr.detectChanges();
+    }
   }
 
   capturePhoto() {

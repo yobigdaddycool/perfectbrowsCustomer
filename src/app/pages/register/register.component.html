@@ -203,14 +203,23 @@
               }
 
               <!-- Camera active - Live video -->
-              @if (cameraActive && !photoPreview) {
-                <div class="camera-container">
-                  <video #videoElement autoplay playsinline class="camera-video"></video>
-                </div>
-              }
+                @if (cameraActive && !photoPreview) {
+                  <div class="camera-container">
+                    <video #videoElement autoplay playsinline class="camera-video"></video>
+                    <button
+                      type="button"
+                      class="camera-toggle-btn"
+                      (click)="toggleCameraFacing()"
+                      [disabled]="isSwitchingCamera"
+                      aria-label="Switch camera"
+                      title="Switch camera">
+                      <span aria-hidden="true">&#8635;</span>
+                    </button>
+                  </div>
+                }
 
-              <!-- Photo preview (before confirmation) -->
-              @if (photoPreview) {
+                <!-- Photo preview (before confirmation) -->
+                @if (photoPreview) {
                 <div class="photo-preview">
                   <img [src]="photoPreview" alt="Photo preview" />
                 </div>
