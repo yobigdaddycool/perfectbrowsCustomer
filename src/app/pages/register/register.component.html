@@ -1,4 +1,4 @@
-ï»¿<div class="wrap">
+<div class="wrap">
   <div class="card" role="region" aria-label="Customer Intake">
     <div class="header">
       <div class="brand">
@@ -91,11 +91,11 @@
                       [class.error]="fieldErrors['stylist']"
                       [class.flash-error]="isFlashing('stylist')">
                 <option value="" selected disabled>Select stylist...</option>
-                <option>Any Available</option>
-                <option>Anna</option>
-                <option>Layla</option>
-                <option>Maria</option>
-                <option>Nora</option>
+                <option value="Any">Any Available</option>
+                <option value="Anna">Anna</option>
+                <option value="Layla">Layla</option>
+                <option value="Maria">Maria</option>
+                <option value="Nora">Nora</option>
               </select>
               @if (fieldErrors['stylist']) {
                 <div class="error-message">
@@ -402,3 +402,5 @@
 <div class="toast" [class.show]="showToast" role="status" aria-live="polite" (click)="hideToast()">
   {{ toastMessage }}
 </div>
+
+

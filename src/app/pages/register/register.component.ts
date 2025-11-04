@@ -208,8 +208,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Populate most recent appointment data if available
     if (data.last_appointment) {
-      // Use stylist first name (matches dropdown options like "Anna", "Layla")
-      this.customer.stylist = data.last_appointment.stylist_first_name || '';
+      // Use stylist selection value (handles virtual "Any Available")
+      const stylistFirst = data.last_appointment.stylist_first_name || '';
+      const stylistLast = data.last_appointment.stylist_last_name || '';
+      const stylistCombined = `${stylistFirst} ${stylistLast}`.trim();
+      if (stylistCombined.toLowerCase() === 'any available') {
+        this.customer.stylist = 'Any';
+      } else {
+        this.customer.stylist = stylistFirst || stylistCombined;
+      }
       // Use service name (matches dropdown options like "Threading", "Waxing")
       this.customer.service = data.last_appointment.service_name || '';
       this.customer.visitType = data.last_appointment.visit_type || 'Return';

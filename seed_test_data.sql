@@ -30,7 +30,7 @@ INSERT INTO `customer_photos` (`customer_id`, `file_name`, `file_path`, `photo_t
 -- ============================================
 -- INSERT TEST APPOINTMENTS
 -- ============================================
--- Using existing stylists (Anna=1, Layla=2, Maria=3, Nora=4)
+-- Using existing stylists (Any=1, Anna=2, Layla=3, Maria=4, Nora=5)
 -- Using existing services (Threading=1, Waxing=2, Tinting=3, Lashes=4, Facial=5)
 -- Using existing visit_types (New=1, Returning=2, Walk-in=3)
 
@@ -75,7 +75,6 @@ INSERT INTO `appointments` (
 ),
 
 -- Customer 2: Today's appointment (checked in)
-(on the register page, i need the search button link to be poitning to the search 
     2,
     3, -- Maria
     4, -- Lashes
@@ -194,18 +193,23 @@ WHERE check_in_status = 'checked_in' AND appointment_date = CURDATE();
 -- ============================================
 -- TEST DATA CREATED:
 -- ============================================
--- ✓ 3 Test Customers
+-- ? 3 Test Customers
 --   - TestFirstName01 TestLastName01 (2 appointments, 3 photos)
 --   - TestFirstName02 TestLastName02 (2 appointments, 1 photo)
 --   - TestFirstName03 TestLastName03 (2 appointments, 1 photo)
 --
--- ✓ 6 Test Appointmentsyr
+-- ? 6 Test Appointments
 --   - 1 Completed (past)
 --   - 1 Checked-in (today)
 --   - 1 No-show (past)
 --   - 3 Pending (future)
 --
--- ✓ 5 Photo Records (actual photo files need to be created separately)
+-- ? 5 Photo Records (actual photo files need to be created separately)
 --
--- ✓ All appointments have unique QR codes for testing check-in
+-- ? All appointments have unique QR codes for testing check-in
 -- ============================================
+
+
+
+
+

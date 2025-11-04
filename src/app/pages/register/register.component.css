@@ -326,6 +326,70 @@ input.flash-error, select.flash-error, textarea.flash-error {
   }
 }
 
+@media (max-width: 640px) {
+  .wrap {
+    padding: 12px;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 16px;
+  }
+
+  .brand {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .brand h1 {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .badges {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    font-size: 11px;
+  }
+
+  .grid {
+    gap: 16px;
+  }
+
+  .row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .actions .btn {
+    width: 100%;
+  }
+
+  .connection-status-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 /* Connection Status Indicator */
 .connection-status-container {
   display: flex;
