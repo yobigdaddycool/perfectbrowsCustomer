@@ -404,6 +404,80 @@ export class ScanComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async detectWithZXingInFrame(
+    video: HTMLVideoElement,
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D
+  ): Promise<string | null> {
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    this.zxingReader ??= new BrowserMultiFormatReader();
+
+    try {
+      const result = await this.zxingReader.decodeFromCanvas(canvas);
+      return result?.getText?.() ?? null;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return null;
+      }
+      // For other errors, just log and return null (don't throw in continuous scanning)
+      console.warn('⚠️ ZXing decode error:', error);
+      return null;
+    }
+  }
+
+  private drawSimpleDetectionBox(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    // Draw a yellow box in the center of the frame to indicate detection
+    const boxSize = Math.min(width, height) * 0.6;
+    const x = (width - boxSize) / 2;
+    const y = (height - boxSize) / 2;
+
+    // Yellow color like on phones
+    ctx.strokeStyle = '#FFD700'; // Gold/yellow color
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x, y, boxSize, boxSize);
+
+    // Add semi-transparent yellow fill
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+    ctx.fillRect(x, y, boxSize, boxSize);
+
+    // Add corner markers for a more phone-like appearance
+    const cornerLength = 30;
+    const cornerOffset = 8;
+
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 5;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(x - cornerOffset, y + cornerLength);
+    ctx.lineTo(x - cornerOffset, y - cornerOffset);
+    ctx.lineTo(x + cornerLength, y - cornerOffset);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(x + boxSize - cornerLength, y - cornerOffset);
+    ctx.lineTo(x + boxSize + cornerOffset, y - cornerOffset);
+    ctx.lineTo(x + boxSize + cornerOffset, y + cornerLength);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(x - cornerOffset, y + boxSize - cornerLength);
+    ctx.lineTo(x - cornerOffset, y + boxSize + cornerOffset);
+    ctx.lineTo(x + cornerLength, y + boxSize + cornerOffset);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(x + boxSize - cornerLength, y + boxSize + cornerOffset);
+    ctx.lineTo(x + boxSize + cornerOffset, y + boxSize + cornerOffset);
+    ctx.lineTo(x + boxSize + cornerOffset, y + boxSize - cornerLength);
+    ctx.stroke();
+  }
+
   private async handleDetectedPayload(rawPayload: string): Promise<void> {
     const payload = (rawPayload ?? '').trim();
 
@@ -584,31 +658,45 @@ export class ScanComponent implements OnInit, OnDestroy {
     // Clear previous drawings
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    let detected = false;
+    let payload: string | null = null;
+
     try {
-      // Try to detect QR code with BarcodeDetector (preferred - gives bounding box)
+      // Try BarcodeDetector first (if available)
       if (this.barcodeDetector) {
         const results = await this.barcodeDetector.detect(video);
-
         if (results.length > 0) {
           const barcode = results[0];
-          const payload = barcode.rawValue?.trim();
-
-          // Draw detection box
-          this.drawDetectionBox(ctx, barcode);
-
-          // Process if not in cooldown and payload is different
-          if (payload && !this.detectionCooldown && payload !== this.lastDetectedPayload) {
-            this.lastDetectedPayload = payload;
-            this.detectionCooldown = true;
-            await this.handleDetectedPayload(payload);
-
-            // Reset cooldown after 3 seconds
-            setTimeout(() => {
-              this.detectionCooldown = false;
-              this.lastDetectedPayload = null;
-            }, 3000);
+          payload = barcode.rawValue?.trim() || null;
+          if (payload) {
+            detected = true;
+            this.drawDetectionBox(ctx, barcode);
           }
         }
+      }
+
+      // Fallback to ZXing if BarcodeDetector didn't find anything
+      if (!detected) {
+        payload = await this.detectWithZXingInFrame(video, canvas, ctx);
+        if (payload) {
+          detected = true;
+          // Draw a simple box around center of frame for ZXing detection
+          this.drawSimpleDetectionBox(ctx, canvas.width, canvas.height);
+        }
+      }
+
+      // Process if we detected something
+      if (detected && payload && !this.detectionCooldown && payload !== this.lastDetectedPayload) {
+        console.log('🎯 QR Code detected in continuous scan:', payload);
+        this.lastDetectedPayload = payload;
+        this.detectionCooldown = true;
+        await this.handleDetectedPayload(payload);
+
+        // Reset cooldown after 3 seconds
+        setTimeout(() => {
+          this.detectionCooldown = false;
+          this.lastDetectedPayload = null;
+        }, 3000);
       }
     } catch (error) {
       console.warn('⚠️ Frame scan error:', error);
@@ -624,7 +712,7 @@ export class ScanComponent implements OnInit, OnDestroy {
 
     if (corners && corners.length === 4) {
       // Draw polygon around QR code using corner points
-      ctx.strokeStyle = '#00ff00'; // Green color
+      ctx.strokeStyle = '#FFD700'; // Yellow/gold color like phones
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(corners[0].x, corners[0].y);
@@ -634,15 +722,15 @@ export class ScanComponent implements OnInit, OnDestroy {
       ctx.closePath();
       ctx.stroke();
 
-      // Add semi-transparent fill
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+      // Add semi-transparent yellow fill
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
       ctx.fill();
     } else if (box) {
       // Fallback to bounding box rectangle
-      ctx.strokeStyle = '#00ff00';
+      ctx.strokeStyle = '#FFD700'; // Yellow/gold color like phones
       ctx.lineWidth = 4;
       ctx.strokeRect(box.x, box.y, box.width, box.height);
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
       ctx.fillRect(box.x, box.y, box.width, box.height);
     }
   }
