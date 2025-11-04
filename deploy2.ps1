@@ -118,7 +118,7 @@ try {
   if ($reply -match '^(y|yes)$') {
     $ssh = 'C:\\Program Files\\Git\\usr\\bin\\ssh.exe'
     $remote = 'ichrqhmy@ich.rqh.mybluehost.me'
-    $remoteCmd = "cd public_html/website_2eb58030 && GIT_SSH_COMMAND='ssh -oIdentitiesOnly=yes -oStrictHostKeyChecking=accept-new' git pull --ff-only origin"
+    $remoteCmd = "cd public_html/website_2eb58030 && git pull --ff-only origin"
     & $ssh -A $remote $remoteCmd
   }
 } catch {
