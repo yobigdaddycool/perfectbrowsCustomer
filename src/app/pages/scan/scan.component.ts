@@ -510,34 +510,26 @@ export class ScanComponent implements OnInit, OnDestroy {
 
     console.log('===============================');
 
-    // Build display message for screen (visible on phone!)
-    let displayMessage = `RAW PAYLOAD:\n${payload}\n\n`;
-
-    if (parseError) {
-      displayMessage += `⚠️ ${parseError}\n`;
-    } else if (parsedData) {
-      displayMessage += `✅ PARSED JSON:\n`;
-      displayMessage += `Customer ID: ${customerId || 'NOT FOUND'}\n`;
-      if (parsedData.firstName) displayMessage += `Name: ${parsedData.firstName} ${parsedData.lastName || ''}\n`;
-      if (parsedData.phone) displayMessage += `Phone: ${parsedData.phone}\n`;
-      if (parsedData.generatedAt) displayMessage += `Generated: ${parsedData.generatedAt}\n`;
+    if (!customerId) {
+      this.scanError = 'No customer ID found in QR code';
+      this.showToastMessage(this.scanError);
+      this.isProcessingScan = false;
+      this.cdr.markForCheck();
+      return;
     }
 
-    // Show on screen
-    this.scanStatusMessage = displayMessage;
-    this.showToastMessage(`QR Code Detected! Customer ID: ${customerId || 'Unknown'}`);
-    this.isProcessingScan = false;
+    // Send to API for lookup
+    this.scanStatusMessage = 'Looking up customer...';
     this.cdr.markForCheck();
 
-    // TODO: Next step will be to send this to API for lookup
-    // this.http
-    //   .post<ScanApiResponse>(`${this.apiUrl}?action=scan-qr`, JSON.stringify({ payload }), {
-    //     headers: this.headers
-    //   })
-    //   .subscribe({
-    //     next: response => this.handleScanResponse(response, payload),
-    //     error: error => this.handleScanError(error)
-    //   });
+    this.http
+      .post<ScanApiResponse>(`${this.apiUrl}?action=scan-qr`, JSON.stringify({ payload }), {
+        headers: this.headers
+      })
+      .subscribe({
+        next: response => this.handleScanResponse(response, payload),
+        error: error => this.handleScanError(error)
+      });
   }
 
   private handleScanResponse(response: ScanApiResponse, payload: string): void {
@@ -548,7 +540,7 @@ export class ScanComponent implements OnInit, OnDestroy {
       const customerName = response.data.fullName;
 
       const successMessage =
-        response.message ?? (customerName ? `Opening ${customerName}'s profile...` : 'Customer found!');
+        response.message ?? (customerName ? `Found ${customerName}!` : 'Customer found!');
 
       this.scanStatusMessage = successMessage;
       this.toastMessage = successMessage;
@@ -561,6 +553,8 @@ export class ScanComponent implements OnInit, OnDestroy {
       });
       this.cdr.markForCheck();
 
+      // Navigate to register component in edit mode
+      console.log('🚀 Navigating to register component for customer ID:', customerId);
       this.navigationSub = timer(500).subscribe(() => {
         this.router.navigate(['/register', customerId], { state: { source: 'scan' } }).catch(err => {
           console.error('❌ Navigation error:', err);
@@ -578,7 +572,8 @@ export class ScanComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const message = response.message || 'No customer found for this QR code.';
+    // Customer not found
+    const message = response.message || 'Customer not found for this QR code.';
     this.scanError = message;
     this.showToastMessage(message);
     this.scanResults.setResult({
