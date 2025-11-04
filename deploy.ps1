@@ -65,7 +65,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # push MAIN
 git add -A
-git commit -m "huge deployement update"
+git commit -m "Qr scanner searcgh functionality"
 git push -u origin main
 
 # publish DEPLOY (worktree)

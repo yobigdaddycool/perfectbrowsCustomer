@@ -1,2 +1,76 @@
-﻿<h2 style="margin:0 0 12px 0">QR Scanner</h2>
-<p>Placeholder - Phase 4 will add camera + scanning.</p>
+<div class="scan-wrapper">
+  <header class="scan-header">
+    <h2>QR Scanner</h2>
+    <p>Align the customer&apos;s QR code in the camera view, then tap Scan Now to read it.</p>
+  </header>
+
+  <div class="scan-controls">
+    @if (cameraActive) {
+      <button type="button" class="btn-primary" (click)="scanNow()" [disabled]="isProcessingScan">
+        Scan Now
+      </button>
+      <button type="button" class="btn-outline stop" (click)="closeCamera()">Close Camera</button>
+    }
+  </div>
+
+  @if (cameraError) {
+    <div class="alert warning">
+      <strong>Camera Error</strong>
+      <p>{{ cameraError }}</p>
+    </div>
+  }
+
+  @if (cameraActive) {
+    <div class="scanner-frame" [class.processing]="isProcessingScan">
+      <video #videoElement autoplay playsinline muted class="camera-video"></video>
+      <canvas #canvasElement hidden></canvas>
+
+      <button
+        type="button"
+        class="camera-toggle-btn"
+        [disabled]="devices.length < 2 || isProcessingScan"
+        (click)="toggleCamera()"
+        aria-label="Switch camera"
+        title="Switch camera"
+      >
+        <span aria-hidden="true">&#8634;</span>
+      </button>
+
+      @if (isProcessingScan) {
+        <div class="processing-overlay" aria-live="polite">
+          <div class="loader"></div>
+          <span>Processing scan...</span>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="scanner-placeholder">
+      <div class="placeholder-inner">
+        <div class="placeholder-icon">📷</div>
+        <p>Activating camera...</p>
+      </div>
+    </div>
+  }
+
+  @if (scanStatusMessage) {
+    <div class="status success">
+      {{ scanStatusMessage }}
+    </div>
+  }
+
+  @if (scanError) {
+    <div class="status error">
+      <div>{{ scanError }}</div>
+    </div>
+  }
+
+  <footer class="scan-footer">
+    <a routerLink="/register" class="btn-outline">Back to Register</a>
+    <a routerLink="/search" class="btn-link">Need manual lookup?</a>
+  </footer>
+
+  <div class="toast" [class.show]="showToast" role="status" aria-live="polite">
+    {{ toastMessage }}
+  </div>
+</div>
+

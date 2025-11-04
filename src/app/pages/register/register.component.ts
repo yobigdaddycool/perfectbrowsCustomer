@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { DatabaseConnectionService } from '../../services/database-connection.service';
+import { ScanResultService } from '../../services/scan-result.service';
 import * as QRCode from 'qrcode';
 
 @Component({
@@ -80,7 +81,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
-    public dbConnection: DatabaseConnectionService
+    public dbConnection: DatabaseConnectionService,
+    private scanResults: ScanResultService
   ) {}
 
   // Method to check if user can leave (for navigation guard)
@@ -93,6 +95,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     console.log('🚀 RegisterComponent initialized');
+
+    this.consumeScanResultMessage();
 
     // Set minimum date to yesterday (one day in the past)
     const yesterday = new Date();
@@ -130,8 +134,21 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopCamera();
-    // Remove beforeunload listener
-    window.removeEventListener('beforeunload', this.handleBeforeUnload);
+
+    // Ensure video element is fully cleared
+    if (this.videoElement) {
+      const video = this.videoElement.nativeElement;
+      if (video.srcObject) {
+        const stream = video.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+    }
+
+    // Remove beforeunload listener (browser only)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', this.handleBeforeUnload);
+    }
   }
 
   // Warn user before leaving page with unsaved changes
@@ -953,6 +970,17 @@ hideToast() {
       this.showToastMessage(this.cameraError);
       this.cdr.detectChanges();
     }
+  }
+
+  private consumeScanResultMessage() {
+    const scanResult = this.scanResults.consumeResult();
+
+    if (!scanResult || scanResult.status !== 'found') {
+      return;
+    }
+
+    const message = scanResult.message || 'Customer loaded from QR scan.';
+    this.showToastMessage(message);
   }
 
   private async getPreferredCameraStream(preference: 'environment' | 'user'): Promise<MediaStream> {
