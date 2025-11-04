@@ -933,17 +933,9 @@ hideToast() {
 
     try {
       // Now request camera access after video element is rendered
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-
+      this.stream = await this.getPreferredCameraStream();
       // Wait for Angular to render the video element, then start playback
       this.startVideoPlayback();
-
     } catch (error: any) {
       console.error('Camera access error:', error);
       this.cameraActive = false; // Reset if camera fails
@@ -956,6 +948,44 @@ hideToast() {
       this.showToastMessage(this.cameraError);
       this.cdr.detectChanges();
     }
+  }
+
+  private async getPreferredCameraStream(): Promise<MediaStream> {
+    const baseVideoSettings: MediaTrackConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    };
+
+    const fallbackReasons = new Set(['OverconstrainedError', 'NotFoundError']);
+
+    const attempts: MediaTrackConstraints['facingMode'][] = [
+      { exact: 'environment' },
+      { ideal: 'environment' }
+    ];
+
+    for (const facingMode of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          video: {
+            ...baseVideoSettings,
+            facingMode
+          }
+        });
+      } catch (error: any) {
+        if (!error || !fallbackReasons.has(error.name)) {
+          throw error;
+        }
+        console.warn('Preferred camera constraint failed, trying next option:', error);
+      }
+    }
+
+    console.warn('Falling back to front camera');
+    return navigator.mediaDevices.getUserMedia({
+      video: {
+        ...baseVideoSettings,
+        facingMode: 'user'
+      }
+    });
   }
 
   private startVideoPlayback(retryCount = 0) {
