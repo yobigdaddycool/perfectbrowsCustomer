@@ -3,9 +3,6 @@
 # ============================================
 $sshKeyPassphrase = "Perfect123!"
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
 Write-Host "Setting up SSH agent..."
 
 # Clear any existing SSH_ASKPASS that might interfere
@@ -29,37 +26,27 @@ Write-Host "Adding SSH key..."
 # Convert Windows path to Unix path for bash
 $sshAuthSockUnix = $env:SSH_AUTH_SOCK -replace '\\', '/' -replace '^([A-Z]):', '/mnt/$1'.ToLower()
 
-# Use PowerShell process control to feed passphrase to ssh-add
-$sshAddPath = "C:\Program Files\Git\usr\bin\ssh-add.exe"
-$sshKeyPath = Join-Path $env:USERPROFILE ".ssh\id_rsa"
+# Use SSH_ASKPASS helper to provide password without prompting
+$bashCommand = @"
+export SSH_AUTH_SOCK='$sshAuthSockUnix'
+export SSH_AGENT_PID='$($env:SSH_AGENT_PID)'
+export SSH_ASKPASS_REQUIRE=force
+export DISPLAY='askpass:0'
+export SSH_ASKPASS='/tmp/ssh-pass-helper'
+cat <<'EOF' > /tmp/ssh-pass-helper
+#!/bin/sh
+printf '%s\n' '$sshKeyPassphrase'
+EOF
+chmod +x /tmp/ssh-pass-helper
+ssh-add ~/.ssh/id_rsa < /dev/null
+result=$?
+rm -f /tmp/ssh-pass-helper
+exit $result
+"@
 
-$psi = New-Object System.Diagnostics.ProcessStartInfo
-$psi.FileName = $sshAddPath
-$psi.Arguments = "`"$sshKeyPath`""
-$psi.UseShellExecute = $false
-$psi.RedirectStandardInput = $true
-$psi.RedirectStandardOutput = $true
-$psi.RedirectStandardError = $true
-$psi.EnvironmentVariables["SSH_AUTH_SOCK"] = $env:SSH_AUTH_SOCK
-$psi.EnvironmentVariables["SSH_AGENT_PID"] = $env:SSH_AGENT_PID
-
-$process = [System.Diagnostics.Process]::Start($psi)
-$process.StandardInput.WriteLine($sshKeyPassphrase)
-$process.StandardInput.Close()
-
-$sshAddStdOut = $process.StandardOutput.ReadToEnd()
-$sshAddStdErr = $process.StandardError.ReadToEnd()
-$process.WaitForExit()
-
-if ($sshAddStdOut.Trim()) {
-    Write-Host $sshAddStdOut.Trim()
-}
-if ($sshAddStdErr.Trim()) {
-    Write-Warning $sshAddStdErr.Trim()
-}
-
-if ($process.ExitCode -ne 0) {
-    throw "ssh-add failed with exit code $($process.ExitCode)"
+$output = & "C:\Program Files\Git\bin\bash.exe" -c $bashCommand 2>&1
+if ($output) {
+    Write-Host "Result: $output"
 }
 
 # Verify key was added
@@ -70,11 +57,10 @@ Write-Host "Keys loaded: $(if ($keyList -match 'SHA256') { '1 key(s)' } else { '
 Start-Sleep -Seconds 1
 
 # build
-Write-Host "Building Angular production bundle..."
 ng build --configuration production
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Angular build failed. Aborting deployment."
-    throw "Build failed"
+    exit $LASTEXITCODE
 }
 
 # push MAIN
