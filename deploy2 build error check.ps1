@@ -1,4 +1,4 @@
-﻿# ============================================
+# ============================================
 # Setup SSH key passphrase automation
 # ============================================
 $sshKeyPassphrase = "Perfect123!"
@@ -112,18 +112,6 @@ cd .deploy_publish
 git add -A
 git commit -m "deploy: camera button update"
 git push -u origin deploy
-# Optional: Pull latest to Bluehost now?
-try {
-  $reply = Read-Host 'Pull latest on Bluehost now? (y/N)'
-  if ($reply -match '^(y|yes)$') {
-    $ssh = 'C:\\Program Files\\Git\\usr\\bin\\ssh.exe'
-    $remote = 'ichrqhmy@ich.rqh.mybluehost.me'
-    $remoteCmd = "cd public_html/website_2eb58030 && GIT_SSH_COMMAND='ssh -oIdentitiesOnly=yes -oStrictHostKeyChecking=accept-new' git pull --ff-only origin"
-    & $ssh -A $remote $remoteCmd
-  }
-} catch {
-  Write-Warning "Remote pull step failed: $($_.Exception.Message)"
-}
 cd ..
 git worktree remove .deploy_publish -f 2>$null
 
@@ -135,4 +123,3 @@ if ($env:SSH_AGENT_PID) {
     & "C:\Program Files\Git\usr\bin\ssh-agent.exe" -k 2>&1 | Out-Null
 }
 Write-Host "Deployment complete!"
-
