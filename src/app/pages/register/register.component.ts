@@ -71,6 +71,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
   lastErrorDetails: string | null = null;
   showErrorDetails = false;
 
+  // Dropdown data
+  stylists: Array<{ id: number; name: string }> = [];
+  services: Array<{ id: number; name: string }> = [];
+  isLoadingOptions = false;
+
+  private pendingStylistName: string | null = null;
+  private pendingServiceName: string | null = null;
+
   // Read-only mode for inactive customers
   isReadOnlyMode = false;
   readOnlyStatusLabel: string | null = null;
@@ -105,6 +113,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   ngOnInit() {
     console.log('🚀 RegisterComponent initialized');
 
+    this.loadDropdownData();
     this.consumeScanResultMessage();
     this.initializeReadOnlyFromNavigation();
 
@@ -246,41 +255,69 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Populate most recent appointment data if available
     if (data.last_appointment) {
-      // Use stylist selection value (handles virtual "Any Available")
-      const stylistFirst = data.last_appointment.stylist_first_name || '';
-      const stylistLast = data.last_appointment.stylist_last_name || '';
-      const stylistCombined = `${stylistFirst} ${stylistLast}`.trim();
-      if (stylistCombined.toLowerCase() === 'any available') {
-        this.customer.stylist = 'Any';
-      } else {
-        this.customer.stylist = stylistFirst || stylistCombined;
-      }
-      // Use service name (matches dropdown options like "Threading", "Waxing")
-      this.customer.service = data.last_appointment.service_name || '';
-      this.customer.visitType = data.last_appointment.visit_type || 'Return';
-      this.customer.notes = data.last_appointment.notes || '';
-      this.customer.price = data.last_appointment.quoted_price || '';
+      const appointment = data.last_appointment;
+      const stylistName = `${appointment.stylist_first_name || ''} ${appointment.stylist_last_name || ''}`.trim();
+      const stylistIdFromResponse = this.normalizeId(appointment.stylist_id);
+      const serviceName = appointment.service_name || '';
+      const serviceIdFromResponse = this.normalizeId(appointment.service_id);
 
-      console.log('📅 Populated appointment - Stylist:', this.customer.stylist, 'Service:', this.customer.service);
+      const resolvedStylistId =
+        stylistIdFromResponse ?? (stylistName ? this.findStylistIdByName(stylistName) : null);
+      if (resolvedStylistId !== null) {
+        this.customer.stylist = String(resolvedStylistId);
+        this.pendingStylistName = null;
+      } else {
+        this.customer.stylist = '';
+        this.pendingStylistName = stylistName || null;
+      }
+
+      const resolvedServiceId =
+        serviceIdFromResponse ?? (serviceName ? this.findServiceIdByName(serviceName) : null);
+      if (resolvedServiceId !== null) {
+        this.customer.service = String(resolvedServiceId);
+        this.pendingServiceName = null;
+      } else {
+        this.customer.service = '';
+        this.pendingServiceName = serviceName || null;
+      }
+
+      this.customer.visitType = appointment.visit_type || 'Return';
+      this.customer.notes = appointment.notes || '';
+      this.customer.price = appointment.quoted_price || '';
+
+      console.log(
+        '📅 Populated appointment - Stylist ID:',
+        resolvedStylistId,
+        'Service ID:',
+        resolvedServiceId,
+        'Stylist Name:',
+        stylistName,
+        'Service Name:',
+        serviceName
+      );
 
       // Parse date/time if available
-      if (data.last_appointment.appointment_datetime || data.last_appointment.appointment_date) {
-        const datetimeString = data.last_appointment.appointment_datetime
-          || `${data.last_appointment.appointment_date}T00:00:00`;
+      if (appointment.appointment_datetime || appointment.appointment_date) {
+        const datetimeString = appointment.appointment_datetime || `${appointment.appointment_date}T00:00:00`;
         const datetime = new Date(datetimeString);
         if (!Number.isNaN(datetime.getTime())) {
           this.customer.date = datetime.toISOString().split('T')[0];
           this.customer.time = datetime.toTimeString().slice(0, 5);
           console.log('📅 Populated date/time - Date:', this.customer.date, 'Time:', this.customer.time);
         } else {
-          this.customer.date = data.last_appointment.appointment_date || '';
-          this.customer.time = data.last_appointment.appointment_time || '';
+          this.customer.date = appointment.appointment_date || '';
+          this.customer.time = appointment.appointment_time || '';
           console.warn('⚠️ Invalid appointment datetime; using raw values instead');
         }
       } else {
         this.customer.date = '';
         this.customer.time = '';
       }
+    } else {
+      this.customer.stylist = '';
+      this.customer.service = '';
+      this.pendingStylistName = null;
+      this.pendingServiceName = null;
     }
 
     // Load profile photo if available
@@ -310,6 +347,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
 
     this.isPhotoProcessing = false;
+    this.applyPendingOptionMatches();
   }
 
   // Store original form data to compare later
@@ -335,6 +373,35 @@ export class RegisterComponent implements OnInit, OnDestroy {
     });
     this.isFormDirty = currentFormData !== this.originalFormData;
     console.log('🔍 Form dirty check:', this.isFormDirty);
+  }
+
+  private applyPendingOptionMatches() {
+    let didUpdate = false;
+
+    if (!this.customer.stylist && this.pendingStylistName) {
+      const matchId = this.findStylistIdByName(this.pendingStylistName);
+      if (matchId !== null) {
+        this.customer.stylist = String(matchId);
+        this.pendingStylistName = null;
+        didUpdate = true;
+      }
+    }
+
+    if (!this.customer.service && this.pendingServiceName) {
+      const matchId = this.findServiceIdByName(this.pendingServiceName);
+      if (matchId !== null) {
+        this.customer.service = String(matchId);
+        this.pendingServiceName = null;
+        didUpdate = true;
+      }
+    }
+
+    if (didUpdate) {
+      if (this.originalFormData) {
+        this.checkFormDirty();
+      }
+      this.cdr.detectChanges();
+    }
   }
 
   async onSubmit() {
@@ -378,6 +445,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('💾 Creating new customer:', this.customer);
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
 
+    const stylistId = this.normalizeId(this.customer.stylist);
+    const serviceId = this.normalizeId(this.customer.service);
+    console.log('🎯 Resolved stylist ID:', stylistId, 'service ID:', serviceId);
+
     // Prepare data for API
     const createData: any = {
       firstName: this.customer.firstName,
@@ -389,8 +460,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
       // Appointment data
       date: this.customer.date,
       time: this.customer.time,
-      stylist: this.customer.stylist,
-      service: this.customer.service,
+      stylist: stylistId,
+      service: serviceId,
       visitType: this.customer.visitType,
       notes: this.customer.notes,
       price: this.customer.price
@@ -489,6 +560,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('📸 Captured photo exists?', !!this.capturedPhoto);
     console.log('🗑️ Should delete photo?', this.shouldDeletePhoto);
 
+    const stylistId = this.normalizeId(this.customer.stylist);
+    const serviceId = this.normalizeId(this.customer.service);
+    console.log('🎯 Resolved stylist ID for update:', stylistId, 'service ID:', serviceId);
+
     // Prepare data for API
     const updateData: any = {
       customerId: this.customerId,
@@ -501,8 +576,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
       // Appointment data
       date: this.customer.date,
       time: this.customer.time,
-      stylist: this.customer.stylist,
-      service: this.customer.service,
+      stylist: stylistId,
+      service: serviceId,
       visitType: this.customer.visitType,
       notes: this.customer.notes,
       price: this.customer.price
@@ -516,8 +591,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('📅 Appointment data being sent:', {
       date: this.customer.date,
       time: this.customer.time,
-      stylist: this.customer.stylist,
-      service: this.customer.service
+      stylistId,
+      serviceId
     });
 
     // Handle photo deletion or upload
@@ -684,6 +759,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.isPhotoProcessing = false;
     this.lastErrorDetails = null;
     this.showErrorDetails = false;
+    this.pendingStylistName = null;
+    this.pendingServiceName = null;
 
     // Reset dirty flag
     this.storeOriginalFormData();
@@ -1006,6 +1083,42 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.warn(`✋ Action blocked (${context}) - customer record is inactive.`);
     this.showToastMessage(this.inactiveCustomerMessage);
     return false;
+  }
+
+  private findStylistIdByName(name: string): number | null {
+    const normalized = name.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+    const match = this.stylists.find(stylist => stylist.name.toLowerCase() === normalized);
+    return match?.id ?? null;
+  }
+
+  private findServiceIdByName(name: string): number | null {
+    const normalized = name.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+    const match = this.services.find(service => service.name.toLowerCase() === normalized);
+    return match?.id ?? null;
+  }
+
+  private normalizeId(value: unknown): number | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const parsed = Number(trimmed);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
 
   private showToastMessage(message: string) {
@@ -1428,5 +1541,61 @@ hideToast() {
       this.qrCodeDataUrl = null;
       this.qrGeneratedAtDisplay = null;
     }
+  }
+
+  private loadDropdownData() {
+    this.isLoadingOptions = true;
+    let pendingRequests = 2;
+
+    const finalize = () => {
+      pendingRequests -= 1;
+      if (pendingRequests <= 0) {
+        this.isLoadingOptions = false;
+        this.applyPendingOptionMatches();
+        this.cdr.detectChanges();
+      }
+    };
+
+    this.http.get<any>(`${this.apiUrl}?action=get-stylists`).subscribe({
+      next: response => {
+        if (response?.success && Array.isArray(response.data)) {
+          this.stylists = response.data
+            .map((item: any) => ({
+              id: Number(item.stylist_id),
+              name: `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Unknown Stylist'
+            }))
+            .filter((item: any) => !Number.isNaN(item.id));
+          this.cdr.detectChanges();
+        } else {
+          console.warn('⚠️ Failed to load stylists list from API', response);
+        }
+        finalize();
+      },
+      error: error => {
+        console.error('❌ Error loading stylists:', error);
+        finalize();
+      }
+    });
+
+    this.http.get<any>(`${this.apiUrl}?action=get-services`).subscribe({
+      next: response => {
+        if (response?.success && Array.isArray(response.data)) {
+          this.services = response.data
+            .map((item: any) => ({
+              id: Number(item.service_id),
+              name: item.service_name || 'Unnamed Service'
+            }))
+            .filter((item: any) => !Number.isNaN(item.id));
+          this.cdr.detectChanges();
+        } else {
+          console.warn('⚠️ Failed to load services list from API', response);
+        }
+        finalize();
+      },
+      error: error => {
+        console.error('❌ Error loading services:', error);
+        finalize();
+      }
+    });
   }
 }

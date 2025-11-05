@@ -113,13 +113,14 @@
                       [disabled]="isReadOnlyMode"
                       [class.error]="fieldErrors['stylist']"
                       [class.flash-error]="isFlashing('stylist')">
-                <option value="" selected disabled>Select stylist...</option>
-                <option value="Any">Any Available</option>
-                <option value="Anna">Anna</option>
-                <option value="Layla">Layla</option>
-                <option value="Maria">Maria</option>
-                <option value="Nora">Nora</option>
+                <option value="" disabled>Select stylist...</option>
+                @for (stylist of stylists; track stylist.id) {
+                  <option [value]="stylist.id">{{ stylist.name }}</option>
+                }
               </select>
+              @if (stylists.length === 0) {
+                <div class="help">{{ isLoadingOptions ? 'Loading stylists...' : 'No stylists available' }}</div>
+              }
               @if (fieldErrors['stylist']) {
                 <div class="error-message">
                   {{ fieldErrors['stylist'] }}
@@ -143,14 +144,14 @@
                     [disabled]="isReadOnlyMode"
                     [class.error]="fieldErrors['service']"
                     [class.flash-error]="isFlashing('service')">
-              <option value="" selected disabled>Select a service...</option>
-              <option>Facial</option>
-              <option>Lashes</option>
-              <option>Threading</option>
-              <option>Tinting</option>
-              <option>Waxing</option>
-              <option>Other</option>
+              <option value="" disabled>Select a service...</option>
+              @for (service of services; track service.id) {
+                <option [value]="service.id">{{ service.name }}</option>
+              }
             </select>
+            @if (services.length === 0) {
+              <div class="help">{{ isLoadingOptions ? 'Loading services...' : 'No services available' }}</div>
+            }
             @if (fieldErrors['service']) {
               <div class="error-message">
                 {{ fieldErrors['service'] }}
