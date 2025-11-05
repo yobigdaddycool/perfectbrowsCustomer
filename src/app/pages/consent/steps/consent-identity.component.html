@@ -17,7 +17,7 @@
 
   <label class="field">
     <span>Mobile Phone <sup>*</sup></span>
-    <input type="tel" name="phone" [(ngModel)]="form.phone" required placeholder="(555) 123-4567" />
+    <input type="tel" name="phone" [(ngModel)]="form.phone" required placeholder="(555) 123-4567" (input)="formatPhoneNumber($event)" />
     <small class="hint">We use this to match your profile and send appointment updates.</small>
   </label>
 
