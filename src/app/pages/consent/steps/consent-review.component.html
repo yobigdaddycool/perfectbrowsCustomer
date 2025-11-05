@@ -23,9 +23,17 @@
   </section>
 
   <label class="confirm-checkbox">
-    <input type="checkbox" [(ngModel)]="acknowledgedTerms" name="acknowledgedTerms" required />
+    <input
+      type="checkbox"
+      [(ngModel)]="acknowledgedTerms"
+      name="acknowledgedTerms"
+      required
+      (change)="onAcknowledgedChange()" />
     <span>I acknowledge that I have read, understood, and agree to the terms above.</span>
   </label>
+  @if (showAckError) {
+    <div class="error-bubble">Please acknowledge the consent terms before continuing.</div>
+  }
 
   <div class="signature-card">
     <label class="signature-field">
@@ -36,10 +44,11 @@
         [(ngModel)]="signatureText"
         required
         minlength="2"
-        placeholder="e.g., Ayesha Khan" />
+        [attr.placeholder]="signatureHint && signatureHint.trim() ? signatureHint.trim() : 'Type your full name'"
+        (input)="onSignatureInput($any($event.target).value)" />
     </label>
     <p class="signature-note">
-      By providing this signature, you confirm that you are the person named above and consent to the Perfect Brow service agreement.
+      Please type your first and last name exactly as entered on the identity step. By providing this signature, you confirm that you are the person named above and consent to the Perfect Brow service agreement.
     </p>
   </div>
 
@@ -52,6 +61,6 @@
 
   <footer class="step-footer">
     <button type="button" class="btn-outline" (click)="back.emit()">Back</button>
-    <button type="submit" class="btn-primary" [disabled]="!canContinue">Continue</button>
+    <button type="submit" class="btn-primary" [disabled]="!isContinueEnabled">Continue</button>
   </footer>
 </form>

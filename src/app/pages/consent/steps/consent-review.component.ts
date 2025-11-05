@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 interface ConsentSection {
@@ -25,17 +25,31 @@ export class ConsentReviewComponent {
   @Input() isExpanded = true;
   @Input() leadText: string | null = null;
   @Input() enableContactUpdatePrompt = true;
+  @Input() signatureHint: string | null = null;
+  @Input() expectedSignature: string | null = null;
+  @Input() expectedFirstName = '';
+  @Input() expectedLastName = '';
+  @Input() initialReviewData: ReviewSubmission | null = null;
   @Output() back = new EventEmitter<void>();
   @Output() continue = new EventEmitter<ReviewSubmission>();
 
   expandedSections = new Set<number>();
   acknowledgedTerms = false;
   signatureText = '';
-  confirmUpdates = true;
+  confirmUpdates = false;
+  showAckError = false;
+  showSignatureError = false;
 
-  ngOnChanges() {
+  ngOnChanges(changes: SimpleChanges) {
     if (this.sections.length && this.expandedSections.size === 0) {
       this.sections.forEach((_, idx) => this.expandedSections.add(idx));
+    }
+
+    // Restore previous data when navigating back
+    if (changes['initialReviewData'] && this.initialReviewData) {
+      this.signatureText = this.initialReviewData.signatureText;
+      this.acknowledgedTerms = this.initialReviewData.acknowledged;
+      this.confirmUpdates = this.initialReviewData.confirmUpdates;
     }
   }
 
@@ -51,19 +65,39 @@ export class ConsentReviewComponent {
     return this.expandedSections.has(index);
   }
 
-  get canContinue(): boolean {
-    return this.acknowledgedTerms && this.signatureText.trim().length >= 2;
-  }
-
   handleContinue() {
-    if (!this.canContinue) {
-      return;
-    }
-
+    // Validation is now handled by the isContinueEnabled getter
+    // This method will only be called when button is enabled (form is valid)
     this.continue.emit({
       signatureText: this.signatureText.trim(),
       confirmUpdates: this.enableContactUpdatePrompt ? this.confirmUpdates : true,
       acknowledged: this.acknowledgedTerms
     });
+  }
+
+  onAcknowledgedChange() {
+    if (this.showAckError && this.acknowledgedTerms) {
+      this.showAckError = false;
+    }
+  }
+
+  onSignatureInput(value: string) {
+    this.signatureText = value;
+  }
+
+  get isSignatureValid(): boolean {
+    const expectedFullName = `${this.expectedFirstName.trim()} ${this.expectedLastName.trim()}`;
+    return this.signatureText.trim() === expectedFullName;
+  }
+
+  get isContinueEnabled(): boolean {
+    const baseValidation = this.acknowledgedTerms && this.isSignatureValid;
+
+    // If contact update prompt is enabled, that checkbox must also be checked
+    if (this.enableContactUpdatePrompt) {
+      return baseValidation && this.confirmUpdates;
+    }
+
+    return baseValidation;
   }
 }

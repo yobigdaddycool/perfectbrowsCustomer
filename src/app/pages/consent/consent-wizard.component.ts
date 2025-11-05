@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ConsentService, ConsentFormDto } from '../../services/consent.service';
 import { ConsentIdentityComponent, IdentityData } from './steps/consent-identity.component';
 import { ConsentReviewComponent, ReviewSubmission } from './steps/consent-review.component';
@@ -32,8 +32,10 @@ interface ConsentSection {
   templateUrl: './consent-wizard.component.html',
   styleUrls: ['./consent-wizard.component.css']
 })
-export class ConsentWizardComponent implements OnInit {
+export class ConsentWizardComponent implements OnInit, OnDestroy {
   private readonly consentService = inject(ConsentService);
+  private inactivityTimer: any = null;
+  private readonly INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
   private readonly fallbackForm: ConsentFormDto = {
     consent_form_id: 0,
     title: 'Perfect Brow Services Consent',
@@ -97,6 +99,28 @@ By signing below, I acknowledge that I have read and fully understand this agree
 
   ngOnInit(): void {
     this.fetchConsentForm();
+    this.resetInactivityTimer();
+  }
+
+  ngOnDestroy(): void {
+    this.clearInactivityTimer();
+  }
+
+  resetInactivityTimer(): void {
+    this.clearInactivityTimer();
+    this.inactivityTimer = setTimeout(() => {
+      if (this.currentStepIndex < this.steps.length - 1) {
+        // Only reset if not on success page
+        this.restart();
+      }
+    }, this.INACTIVITY_TIMEOUT);
+  }
+
+  clearInactivityTimer(): void {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
   }
 
   get currentStep(): ConsentStep {
@@ -107,23 +131,27 @@ By signing below, I acknowledge that I have read and fully understand this agree
     this.identityData = data;
     this.receiptPreview.customerName = `${data.firstName} ${data.lastName}`.trim();
     this.receiptPreview.verificationChannel = data.email || data.phone;
+    this.resetInactivityTimer();
     this.goToNextStep();
   }
 
   handleReviewContinue(submission: ReviewSubmission) {
     this.reviewSubmission = submission;
     this.receiptPreview.signatureName = submission.signatureText;
+    this.resetInactivityTimer();
     this.goToNextStep();
   }
 
   handleVerificationContinue(data: VerificationData) {
     this.verificationData = data;
     this.receiptPreview.stepsCompletedAt = new Date().toISOString();
+    this.resetInactivityTimer();
     this.goToNextStep();
   }
 
   handleResendRequested() {
     // Placeholder for resend cooldown handling (API wiring in later pass)
+    this.resetInactivityTimer();
   }
 
   restart() {
@@ -149,6 +177,7 @@ By signing below, I acknowledge that I have read and fully understand this agree
   goToPreviousStep() {
     if (this.currentStepIndex > 0) {
       this.currentStepIndex -= 1;
+      this.resetInactivityTimer();
     }
   }
 

@@ -20,11 +20,11 @@
           <div class="row">
             <div class="field">
               <label for="firstName" class="req">First Name</label>
-              <input id="firstName" type="text" [(ngModel)]="customer.firstName" name="firstName" placeholder="e.g., Ayesha" required />
+             <input id="firstName" type="text" [(ngModel)]="customer.firstName" name="firstName" placeholder="e.g., Amy" required />
             </div>
             <div class="field">
               <label for="lastName" class="req">Last Name</label>
-              <input id="lastName" type="text" [(ngModel)]="customer.lastName" name="lastName" placeholder="e.g., Khan" required />
+             <input id="lastName" type="text" [(ngModel)]="customer.lastName" name="lastName" placeholder="e.g., David" required />
             </div>
           </div>
 

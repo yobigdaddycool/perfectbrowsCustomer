@@ -65,7 +65,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # push MAIN
 git add -A
-git commit -m "Qr scanner searcgh functionality"
+git commit -m "Consent form, basic fintionality finish"
 git push -u origin main
 
 # publish DEPLOY (worktree)

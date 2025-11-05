@@ -45,7 +45,7 @@
             <div class="field">
               <label for="firstName" class="req">First Name</label>
               <input id="firstName" type="text" [(ngModel)]="customer.firstName" name="firstName"
-                     placeholder="e.g., Ayesha" required
+                     placeholder="e.g., Amy" required
                      (blur)="validateField('firstName', customer.firstName)"
                      (ngModelChange)="checkFormDirty()"
                      [disabled]="isReadOnlyMode"
@@ -60,7 +60,7 @@
             <div class="field">
               <label for="lastName" class="req">Last Name</label>
               <input id="lastName" type="text" [(ngModel)]="customer.lastName" name="lastName" 
-                     placeholder="e.g., Khan" required 
+                     placeholder="e.g., David" required 
                      (blur)="validateField('lastName', customer.lastName)"
                      [disabled]="isReadOnlyMode"
                      [class.error]="fieldErrors['lastName']"

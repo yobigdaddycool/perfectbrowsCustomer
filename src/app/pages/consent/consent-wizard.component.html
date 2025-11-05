@@ -24,7 +24,10 @@
     <main class="consent-content" aria-live="polite">
       @switch (currentStep) {
         @case ('identity') {
-          <app-consent-identity (continue)="handleIdentityContinue($event)"></app-consent-identity>
+          <app-consent-identity
+            [initialData]="identityData"
+            (continue)="handleIdentityContinue($event)">
+          </app-consent-identity>
         }
         @case ('review') {
           @if (isLoadingForm) {
@@ -50,6 +53,10 @@
                 [sections]="consentSections"
                 [leadText]="reviewLeadText"
                 [enableContactUpdatePrompt]="true"
+                [signatureHint]="identityData ? identityData.firstName + ' ' + identityData.lastName : null"
+                [expectedFirstName]="identityData?.firstName || ''"
+                [expectedLastName]="identityData?.lastName || ''"
+                [initialReviewData]="reviewSubmission"
                 (back)="goToPreviousStep()"
                 (continue)="handleReviewContinue($event)">
               </app-consent-review>

@@ -4,7 +4,13 @@
       "Bash(npm start)",
       "Bash(bash -c \"ps aux | grep -E ''npm|node'' | grep -v grep\")",
       "Bash(npm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(\"src/app/pages/consent/steps/consent-review.component.ts\")",
+      "Bash(taskkill /F /PID 1857)",
+      "Bash(taskkill //F //PID 1857)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(ng serve:*)"
     ],
     "deny": [],
     "ask": []
