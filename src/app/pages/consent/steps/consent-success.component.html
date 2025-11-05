@@ -1,0 +1,39 @@
+<section class="step-card success-card">
+  <div class="hero-icon" aria-hidden="true">✓</div>
+  <h2>Consent Submitted!</h2>
+  <p>
+    Thank you for completing your Perfect Brow services consent. A receipt has been sent to your contact email.
+  </p>
+
+  @if (receipt) {
+    <dl class="receipt">
+      <div>
+        <dt>Name</dt>
+        <dd>{{ receipt.customerName || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Signed</dt>
+        <dd>{{ receipt.stepsCompletedAt | date: 'fullDate' }}</dd>
+      </div>
+      <div>
+        <dt>Verification</dt>
+        <dd>{{ receipt.verificationChannel || 'Confirmed in studio' }}</dd>
+      </div>
+      <div>
+        <dt>Consent Version</dt>
+        <dd>{{ receipt.consentVersion }}</dd>
+      </div>
+      @if (receipt.signatureName) {
+        <div>
+          <dt>Signature</dt>
+          <dd>{{ receipt.signatureName }}</dd>
+        </div>
+      }
+    </dl>
+  }
+
+  <footer class="step-footer">
+    <button type="button" class="btn-primary" (click)="startOver.emit()">Start a new consent</button>
+    <a routerLink="/" class="btn-outline">Return to Register</a>
+  </footer>
+</section>

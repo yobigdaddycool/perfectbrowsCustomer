@@ -1,0 +1,33 @@
+<form class="step-card" (ngSubmit)="handleContinue()">
+  <header class="step-header">
+    <h2>Confirm Your Identity</h2>
+    <p>Please provide your contact details so we can match your consent to your Perfect Brow profile.</p>
+  </header>
+
+  <div class="field-grid">
+    <label class="field">
+      <span>First Name <sup>*</sup></span>
+      <input type="text" name="firstName" [(ngModel)]="form.firstName" required placeholder="e.g., Ayesha" />
+    </label>
+    <label class="field">
+      <span>Last Name <sup>*</sup></span>
+      <input type="text" name="lastName" [(ngModel)]="form.lastName" required placeholder="e.g., Khan" />
+    </label>
+  </div>
+
+  <label class="field">
+    <span>Mobile Phone <sup>*</sup></span>
+    <input type="tel" name="phone" [(ngModel)]="form.phone" required placeholder="(555) 123-4567" />
+    <small class="hint">We use this to match your profile and send appointment updates.</small>
+  </label>
+
+  <label class="field">
+    <span>Email (optional)</span>
+    <input type="email" name="email" [(ngModel)]="form.email" placeholder="name@example.com" />
+    <small class="hint">If provided, a verification code will be delivered here.</small>
+  </label>
+
+  <footer class="step-footer">
+    <button type="submit" class="btn-primary">Continue</button>
+  </footer>
+</form>

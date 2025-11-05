@@ -1,0 +1,57 @@
+<form class="step-card" (ngSubmit)="handleContinue()">
+  <header class="step-header">
+    <h2>Review Consent Terms</h2>
+    <p>Applies to all Perfect Brow services, including eyelash extensions, waxing, threading, and skincare treatments.</p>
+  </header>
+
+  @if (leadText) {
+    <p class="lead">{{ leadText }}</p>
+  }
+
+  <section class="section-list">
+    @for (section of sections; track section.heading; let i = $index) {
+      <article class="section-item" [class.expanded]="isSectionExpanded(i)">
+        <button type="button" class="section-toggle" (click)="toggleSection(i)">
+          <span>{{ section.heading }}</span>
+          <span class="icon">{{ isSectionExpanded(i) ? '−' : '+' }}</span>
+        </button>
+        @if (isSectionExpanded(i)) {
+          <p>{{ section.body }}</p>
+        }
+      </article>
+    }
+  </section>
+
+  <label class="confirm-checkbox">
+    <input type="checkbox" [(ngModel)]="acknowledgedTerms" name="acknowledgedTerms" required />
+    <span>I acknowledge that I have read, understood, and agree to the terms above.</span>
+  </label>
+
+  <div class="signature-card">
+    <label class="signature-field">
+      <span>Type your full name as your electronic signature</span>
+      <input
+        type="text"
+        name="signatureText"
+        [(ngModel)]="signatureText"
+        required
+        minlength="2"
+        placeholder="e.g., Ayesha Khan" />
+    </label>
+    <p class="signature-note">
+      By providing this signature, you confirm that you are the person named above and consent to the Perfect Brow service agreement.
+    </p>
+  </div>
+
+  @if (enableContactUpdatePrompt) {
+    <label class="contact-update">
+      <input type="checkbox" [(ngModel)]="confirmUpdates" name="confirmUpdates" />
+      <span>If a stylist needs to update my existing profile contact details, I approve using this submission as confirmation.</span>
+    </label>
+  }
+
+  <footer class="step-footer">
+    <button type="button" class="btn-outline" (click)="back.emit()">Back</button>
+    <button type="submit" class="btn-primary" [disabled]="!canContinue">Continue</button>
+  </footer>
+</form>

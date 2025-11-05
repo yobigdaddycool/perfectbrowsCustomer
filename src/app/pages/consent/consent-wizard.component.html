@@ -1,0 +1,76 @@
+<div class="consent-wrap">
+  <div class="consent-card">
+    <header class="consent-header">
+      <div class="brand-lockup">
+        <div class="brand-tag">Perfect Brow</div>
+        <h1>Services Consent Wizard</h1>
+        <p>Complete all steps to digitally sign your Perfect Brow service agreement.</p>
+      </div>
+      <ul class="stepper" aria-label="Consent steps">
+        @for (step of steps; track step.id; let index = $index) {
+          <li class="step"
+              [class.active]="index === currentStepIndex"
+              [class.complete]="index < currentStepIndex">
+            <span class="step-index">{{ index + 1 }}</span>
+            <div>
+              <div class="step-title">{{ step.title }}</div>
+              <div class="step-subtitle">{{ step.subtitle }}</div>
+            </div>
+          </li>
+        }
+      </ul>
+    </header>
+
+    <main class="consent-content" aria-live="polite">
+      @switch (currentStep) {
+        @case ('identity') {
+          <app-consent-identity (continue)="handleIdentityContinue($event)"></app-consent-identity>
+        }
+        @case ('review') {
+          @if (isLoadingForm) {
+            <div class="wizard-feedback">
+              <div class="spinner" aria-hidden="true"></div>
+              <p>Loading the latest consent terms...</p>
+            </div>
+          }
+          @else {
+            @if (loadFormError) {
+              <div class="wizard-feedback error">
+                <p>{{ loadFormError }}</p>
+                <button type="button" class="btn-primary" (click)="fetchConsentForm()">Retry loading</button>
+              </div>
+            }
+            @if (!consentSections.length) {
+              <div class="wizard-feedback error">
+                <p>Consent terms are currently unavailable. Please try again later.</p>
+              </div>
+            }
+            @else {
+              <app-consent-review
+                [sections]="consentSections"
+                [leadText]="reviewLeadText"
+                [enableContactUpdatePrompt]="true"
+                (back)="goToPreviousStep()"
+                (continue)="handleReviewContinue($event)">
+              </app-consent-review>
+            }
+          }
+        }
+        @case ('verify') {
+          <app-consent-verify
+            [deliveryChannel]="identityData?.email || identityData?.phone || null"
+            (back)="goToPreviousStep()"
+            (continue)="handleVerificationContinue($event)"
+            (resend)="handleResendRequested()">
+          </app-consent-verify>
+        }
+        @case ('success') {
+          <app-consent-success
+            [receipt]="receiptPreview"
+            (startOver)="restart()">
+          </app-consent-success>
+        }
+      }
+    </main>
+  </div>
+</div>

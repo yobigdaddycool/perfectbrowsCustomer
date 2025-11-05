@@ -4,6 +4,7 @@ export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/register/register.component').then(m => m.RegisterComponent), title: 'Register'  },
   { path: 'search', loadComponent: () => import('./pages/search/search.component').then(m => m.SearchComponent), title: 'Search' },
   { path: 'scan', loadComponent: () => import('./pages/scan/scan.component').then(m => m.ScanComponent), title: 'QR Scanner' },
+  { path: 'consent', loadComponent: () => import('./pages/consent/consent-wizard.component').then(m => m.ConsentWizardComponent), title: 'Consent Wizard' },
   {
     path: 'register',
     loadComponent: () => import('./pages/register/register.component').then(m => m.RegisterComponent),

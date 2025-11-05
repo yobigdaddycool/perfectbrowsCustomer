@@ -1,0 +1,101 @@
+.step-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: center;
+  align-items: center;
+}
+
+.hero-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d946ef, #ec4899);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(217, 70, 239, 0.28);
+}
+
+.success-card h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #111827;
+}
+
+.success-card p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 15px;
+}
+
+.receipt {
+  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+}
+
+.receipt div {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.8);
+}
+
+.receipt dt {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+}
+
+.receipt dd {
+  margin: 0;
+  font-size: 15px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.step-footer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.btn-primary,
+.btn-outline {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #d946ef, #ec4899);
+  color: #fff;
+  border: none;
+  box-shadow: 0 10px 24px rgba(217, 70, 239, 0.25);
+}
+
+.btn-outline {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+}
+
+.btn-primary:hover,
+.btn-outline:hover {
+  transform: translateY(-1px);
+}

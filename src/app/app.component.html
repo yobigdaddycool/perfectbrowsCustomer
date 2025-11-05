@@ -4,9 +4,10 @@
     <h1 style="margin:0;font-size:18px">Salon Customer Manager</h1>
   </div>
   <nav class="nav">
-    <a routerLink="/" [class.active]="false">Register</a>
-    <a routerLink="/search" routerLinkActive="active" [routerLinkActiveOptions]="{exact: false}">Search</a>
-    <a routerLink="/scan" routerLinkActive="active" [routerLinkActiveOptions]="{exact: false}">QR Scanner</a>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Register</a>
+    <a routerLink="/search" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
+    <a routerLink="/scan" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">QR Scanner</a>
+    <a routerLink="/consent" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Consent</a>
   </nav>
   <div class="content">
     <router-outlet></router-outlet>

@@ -5,8 +5,9 @@
   </div>
   <nav class="nav">
     <a routerLink="/" [class.active]="isRegisterActive()">Register</a>
-    <a routerLink="/search" routerLinkActive="active">Search</a>
-    <a routerLink="/scan" routerLinkActive="active">QR Scanner</a>
+    <a routerLink="/search" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
+    <a routerLink="/scan" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">QR Scanner</a>
+    <a routerLink="/consent" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Consent</a>
   </nav>
   <div class="content">
     <router-outlet></router-outlet>

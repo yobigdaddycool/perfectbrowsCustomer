@@ -50,7 +50,9 @@ CREATE TABLE `customers` (
   KEY `idx_email` (`email`),
   KEY `idx_name` (`last_name`, `first_name`),
   KEY `idx_active` (`is_active`),
-  KEY `idx_latest_consent_at` (`latest_consent_at`)
+  KEY `idx_latest_consent_id` (`latest_consent_id`),
+  KEY `idx_latest_consent_at` (`latest_consent_at`),
+  KEY `idx_phone_last_first` (`phone`, `last_name`, `first_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------
@@ -60,13 +62,14 @@ CREATE TABLE `customers` (
 CREATE TABLE `consent_forms` (
   `consent_form_id` INT NOT NULL AUTO_INCREMENT,
   `title` VARCHAR(150) NOT NULL,
-  `version_label` VARCHAR(50) NOT NULL,
-  `body_content` MEDIUMTEXT NOT NULL,
+  `version` VARCHAR(50) NOT NULL,
+  `body` MEDIUMTEXT NOT NULL,
   `effective_date` DATE DEFAULT NULL,
   `is_active` TINYINT(1) DEFAULT 1,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`consent_form_id`),
+  UNIQUE KEY `uniq_consent_version` (`version`),
   KEY `idx_consent_forms_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -81,11 +84,13 @@ CREATE TABLE `consent_submissions` (
   `last_name` VARCHAR(100) NOT NULL,
   `phone` VARCHAR(20) NOT NULL,
   `email` VARCHAR(255) DEFAULT NULL,
-  `verification_code` VARCHAR(12) DEFAULT NULL,
-  `code_expires_at` DATETIME DEFAULT NULL,
-  `verification_status` ENUM('pending', 'verified', 'expired', 'failed') DEFAULT 'pending',
-  `attempt_count` INT DEFAULT 0,
+  `verification_code` CHAR(6) NOT NULL,
+  `code_expires_at` DATETIME NOT NULL,
+  `verification_status` ENUM('pending', 'verified', 'expired', 'failed') NOT NULL DEFAULT 'pending',
+  `attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `last_code_sent_at` DATETIME DEFAULT NULL,
+  `resend_available_at` DATETIME DEFAULT NULL,
+  `resend_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `verified_at` DATETIME DEFAULT NULL,
   `customer_id` INT DEFAULT NULL,
   `ip_address` VARCHAR(45) DEFAULT NULL,
@@ -96,7 +101,8 @@ CREATE TABLE `consent_submissions` (
   KEY `idx_phone_name` (`phone`, `last_name`, `first_name`),
   KEY `idx_verification_code` (`verification_code`),
   KEY `idx_verification_status` (`verification_status`),
-  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_submission_created` (`created_at`),
+  KEY `idx_submission_customer` (`customer_id`),
   CONSTRAINT `fk_consent_submissions_form`
     FOREIGN KEY (`consent_form_id`)
     REFERENCES `consent_forms` (`consent_form_id`)
@@ -118,8 +124,8 @@ CREATE TABLE `customer_consents` (
   `submission_id` INT NOT NULL,
   `signed_at` DATETIME NOT NULL,
   `signature_name` VARCHAR(150) NOT NULL,
-  `signature_payload` LONGTEXT DEFAULT NULL,
-  `metadata_json` LONGTEXT DEFAULT NULL,
+  `signature_payload` JSON DEFAULT NULL,
+  `metadata_json` JSON DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`customer_consent_id`),
   UNIQUE KEY `uniq_submission` (`submission_id`),
@@ -346,12 +352,13 @@ SELECT * FROM visit_types;
 --    - Example: CUST-000001-A1B2C3D4
 --    - Only ONE active QR code per customer at a time
 --    - Stored in customer_qr_codes table with is_active flag
--- 4. Phone numbers are UNIQUE to prevent duplicate customers
+-- 4. Phone numbers are indexed (duplicates allowed; matching logic handled in app)
 -- 5. All foreign keys use RESTRICT to prevent accidental deletions
 -- 6. Customer photos and QR codes use CASCADE delete (deleted with customer)
 -- 7. Use is_active flags to soft-delete dropdown options
 -- 8. display_order controls the order of items in dropdowns
 -- 9. The unique_active_qr_per_customer constraint ensures only 1 active QR per customer
+-- 10. Consent tables capture signature + verification history; JSON columns require MySQL 5.7+
 --
 -- ============================================
 -- MIGRATION NOTES (if updating existing database)
@@ -368,6 +375,10 @@ SELECT * FROM visit_types;
 -- 3. Remove qr_code column from appointments:
 --    ALTER TABLE appointments DROP COLUMN qr_code;
 --    ALTER TABLE appointments DROP INDEX idx_qr_code;
+--
+-- Consent module (new installations already handled above).
+--   For existing databases, create consent tables and latest_consent columns,
+--   then add foreign keys per production migration script.
 --
 -- ============================================
 -- END OF SCRIPT

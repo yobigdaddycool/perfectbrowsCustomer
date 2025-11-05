@@ -90,11 +90,14 @@ try {
         case 'check-duplicate-phone':
             checkDuplicatePhone($response);
             break;
+        case 'get-consent-form':
+            getActiveConsentForm($response);
+            break;
         default:
             $response['success'] = false;
             $response['message'] = 'No action specified';
-            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone';
-            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone";
+            $response['error'] = 'Valid actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone, get-consent-form';
+            $response['debug'][] = "Available actions: test-connection, get-test-data, search-customers, get-services, get-visit-types, get-stylists, get-customer, update-customer, create-customer, scan-qr, check-duplicate-phone, get-consent-form";
             break;
     }
     
@@ -133,6 +136,50 @@ function testConnection(&$response) {
     } catch (PDOException $e) {
         $response['success'] = false;
         $response['message'] = "Database connection failed";
+        $response['error'] = $e->getMessage();
+        $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
+    }
+}
+
+function getActiveConsentForm(&$response) {
+    global $pdo;
+
+    try {
+        $sql = "
+            SELECT
+                consent_form_id,
+                title,
+                version,
+                body,
+                effective_date,
+                is_active,
+                created_at,
+                updated_at
+            FROM consent_forms
+            WHERE is_active = 1
+            ORDER BY
+                COALESCE(effective_date, created_at) DESC,
+                updated_at DESC
+            LIMIT 1
+        ";
+
+        $stmt = $pdo->query($sql);
+        $form = $stmt->fetch();
+
+        if ($form) {
+            $response['success'] = true;
+            $response['message'] = "Active consent form retrieved successfully";
+            $response['data'] = [
+                'form' => $form
+            ];
+        } else {
+            $response['success'] = false;
+            $response['message'] = "No active consent form found";
+            $response['error'] = "consent_forms table does not have an active record";
+        }
+    } catch (PDOException $e) {
+        $response['success'] = false;
+        $response['message'] = "Failed to load consent form";
         $response['error'] = $e->getMessage();
         $response['debug'][] = "❌ PDO Exception: " . $e->getMessage();
     }
