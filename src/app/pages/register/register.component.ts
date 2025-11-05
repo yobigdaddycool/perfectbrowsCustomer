@@ -147,6 +147,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
         }, 10000);
       } else {
         console.log('➕ New customer mode');
+        if (!this.customer.date || !this.customer.time) {
+          this.setDefaultAppointmentDateTime();
+          this.storeOriginalFormData();
+        }
       }
     });
   }
@@ -360,6 +364,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('📋 Original form data stored');
   }
 
+  private setDefaultAppointmentDateTime() {
+    const now = new Date();
+    const pad = (value: number) => value.toString().padStart(2, '0');
+    this.customer.date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    this.customer.time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    this.checkFormDirty();
+  }
+
   // Check if form has been modified
   checkFormDirty() {
     if (this.isReadOnlyMode) {
@@ -498,7 +510,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
 
           this.showToastMessage('Customer Saved Successfully!');
-          this.scrollToTop();
           this.lastErrorDetails = null;
           this.showErrorDetails = false;
 
@@ -663,7 +674,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
           this.cdr.detectChanges();
           this.showToastMessage(successMessage);
-          this.scrollToTop();
           this.isPhotoProcessing = false;
           this.lastErrorDetails = null;
           this.showErrorDetails = false;
@@ -739,6 +749,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       smsConsent: false,
       emailConsent: false
     };
+    this.setDefaultAppointmentDateTime();
     this.fieldErrors = {};
     this.flashingFields.clear();
     this.capturedPhoto = null;
@@ -946,12 +957,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   toggleErrorDetails() {
     this.showErrorDetails = !this.showErrorDetails;
-  }
-
-  private scrollToTop() {
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
   }
 
   private isValidEmail(email: string): boolean {

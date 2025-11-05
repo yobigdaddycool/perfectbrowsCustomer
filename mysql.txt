@@ -12,8 +12,10 @@ USE ichrqhmy_PerfectCustomer;
 -- ============================================
 -- DROP TABLES (if exists - for clean setup)
 -- ============================================
--- Drop in reverse order of dependencies
 
+DROP TABLE IF EXISTS `customer_consents`;
+DROP TABLE IF EXISTS `consent_submissions`;
+DROP TABLE IF EXISTS `consent_forms`;
 DROP TABLE IF EXISTS `appointments`;
 DROP TABLE IF EXISTS `customer_qr_codes`;
 DROP TABLE IF EXISTS `customer_photos`;
@@ -36,6 +38,8 @@ CREATE TABLE `customers` (
   `last_name` VARCHAR(100) NOT NULL,
   `phone` VARCHAR(20) NOT NULL,
   `email` VARCHAR(255) DEFAULT NULL,
+  `latest_consent_id` INT DEFAULT NULL,
+  `latest_consent_at` DATETIME DEFAULT NULL,
   `sms_consent` TINYINT(1) DEFAULT 0,
   `email_consent` TINYINT(1) DEFAULT 0,
   `is_active` TINYINT(1) DEFAULT 1,
@@ -45,8 +49,102 @@ CREATE TABLE `customers` (
   KEY `idx_phone` (`phone`),
   KEY `idx_email` (`email`),
   KEY `idx_name` (`last_name`, `first_name`),
-  KEY `idx_active` (`is_active`)
+  KEY `idx_active` (`is_active`),
+  KEY `idx_latest_consent_at` (`latest_consent_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------
+-- Table: consent_forms
+-- Purpose: Versioned consent form content
+-- --------------------------------------------
+CREATE TABLE `consent_forms` (
+  `consent_form_id` INT NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `version_label` VARCHAR(50) NOT NULL,
+  `body_content` MEDIUMTEXT NOT NULL,
+  `effective_date` DATE DEFAULT NULL,
+  `is_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`consent_form_id`),
+  KEY `idx_consent_forms_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------
+-- Table: consent_submissions
+-- Purpose: Store intake + verification attempts
+-- --------------------------------------------
+CREATE TABLE `consent_submissions` (
+  `submission_id` INT NOT NULL AUTO_INCREMENT,
+  `consent_form_id` INT NOT NULL,
+  `first_name` VARCHAR(100) NOT NULL,
+  `last_name` VARCHAR(100) NOT NULL,
+  `phone` VARCHAR(20) NOT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `verification_code` VARCHAR(12) DEFAULT NULL,
+  `code_expires_at` DATETIME DEFAULT NULL,
+  `verification_status` ENUM('pending', 'verified', 'expired', 'failed') DEFAULT 'pending',
+  `attempt_count` INT DEFAULT 0,
+  `last_code_sent_at` DATETIME DEFAULT NULL,
+  `verified_at` DATETIME DEFAULT NULL,
+  `customer_id` INT DEFAULT NULL,
+  `ip_address` VARCHAR(45) DEFAULT NULL,
+  `user_agent` VARCHAR(500) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`submission_id`),
+  KEY `idx_phone_name` (`phone`, `last_name`, `first_name`),
+  KEY `idx_verification_code` (`verification_code`),
+  KEY `idx_verification_status` (`verification_status`),
+  KEY `idx_customer_id` (`customer_id`),
+  CONSTRAINT `fk_consent_submissions_form`
+    FOREIGN KEY (`consent_form_id`)
+    REFERENCES `consent_forms` (`consent_form_id`)
+    ON DELETE RESTRICT,
+  CONSTRAINT `fk_consent_submissions_customer`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `customers` (`customer_id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------
+-- Table: customer_consents
+-- Purpose: Link signed consents to customers
+-- --------------------------------------------
+CREATE TABLE `customer_consents` (
+  `customer_consent_id` INT NOT NULL AUTO_INCREMENT,
+  `customer_id` INT NOT NULL,
+  `consent_form_id` INT NOT NULL,
+  `submission_id` INT NOT NULL,
+  `signed_at` DATETIME NOT NULL,
+  `signature_name` VARCHAR(150) NOT NULL,
+  `signature_payload` LONGTEXT DEFAULT NULL,
+  `metadata_json` LONGTEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`customer_consent_id`),
+  UNIQUE KEY `uniq_submission` (`submission_id`),
+  KEY `idx_customer_signed` (`customer_id`, `signed_at`),
+  KEY `idx_consent_form` (`consent_form_id`),
+  CONSTRAINT `fk_customer_consents_customer`
+    FOREIGN KEY (`customer_id`)
+    REFERENCES `customers` (`customer_id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `fk_customer_consents_form`
+    FOREIGN KEY (`consent_form_id`)
+    REFERENCES `consent_forms` (`consent_form_id`)
+    ON DELETE RESTRICT,
+  CONSTRAINT `fk_customer_consents_submission`
+    FOREIGN KEY (`submission_id`)
+    REFERENCES `consent_submissions` (`submission_id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Link latest consent reference back to customers
+ALTER TABLE `customers`
+  ADD CONSTRAINT `fk_customers_latest_consent`
+    FOREIGN KEY (`latest_consent_id`)
+    REFERENCES `customer_consents` (`customer_consent_id`)
+    ON DELETE SET NULL;
 
 -- --------------------------------------------
 -- Table: customer_photos
