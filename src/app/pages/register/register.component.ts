@@ -419,16 +419,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Check for duplicate phone numbers (unless in edit mode)
-    if (!this.isEditMode) {
-      const isDuplicate = await this.checkDuplicatePhone(this.customer.phone);
-      if (isDuplicate) {
-        this.fieldErrors['phone'] = 'This phone number is already registered';
-        this.showToastMessage('Phone number already exists. Please use a different number.');
-        this.triggerFlashAnimation(['phone']);
-        return;
-      }
-    }
+    // Duplicate phone check temporarily disabled (backend now permits duplicates)
 
     if (this.isEditMode && this.customerId) {
       this.updateCustomer();

@@ -42,7 +42,7 @@ CREATE TABLE `customers` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`customer_id`),
-  UNIQUE KEY `idx_phone` (`phone`),
+  KEY `idx_phone` (`phone`),
   KEY `idx_email` (`email`),
   KEY `idx_name` (`last_name`, `first_name`),
   KEY `idx_active` (`is_active`)
