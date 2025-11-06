@@ -36,6 +36,7 @@ export class ConsentIdentityComponent {
   customerMatches: CustomerMatch[] = [];
   showMatchCards = false;
   isLoadingMatches = false;
+  matchedCustomer: CustomerMatch | null = null;
 
   ngOnInit() {
     if (this.initialData) {
@@ -44,14 +45,23 @@ export class ConsentIdentityComponent {
   }
 
   handleContinue() {
+    if (this.isLoadingMatches) {
+      return;
+    }
+
     // If user already selected a match or confirmed "proceed as new", emit immediately
     if (this.form.selectedCustomerId !== null || this.showMatchCards) {
+      this.matchedCustomer = null;
       this.continue.emit({ ...this.form });
       return;
     }
 
     // Call API to find customer matches
     this.isLoadingMatches = true;
+    this.customerMatches = [];
+    this.showMatchCards = false;
+    this.matchedCustomer = null;
+    this.form.selectedCustomerId = null;
 
     this.consentService.findCustomerMatches(
       this.form.firstName,
@@ -59,23 +69,37 @@ export class ConsentIdentityComponent {
       this.form.phone
     ).subscribe({
       next: (matches) => {
+        console.log('📥 Component received matches:', matches);
         this.isLoadingMatches = false;
+        console.log('🔄 Set isLoadingMatches to false');
         this.customerMatches = matches;
+
+        const exactMatch = matches.find(m => m.match_type === 'exact');
+        if (exactMatch) {
+          this.matchedCustomer = exactMatch;
+          this.form.selectedCustomerId = exactMatch.customer_id;
+          console.log('✅ Exact match found, awaiting user confirmation');
+          return;
+        }
 
         // Filter to only suggested matches (not exact, since exact will auto-link later)
         const suggestedMatches = matches.filter(m => m.match_type === 'suggested');
+        console.log('🔍 Suggested matches:', suggestedMatches);
 
         if (suggestedMatches.length > 0) {
           // Show "Is this you?" cards
           this.showMatchCards = true;
+          console.log('✅ Showing match cards');
         } else {
-          // No matches or only exact match - proceed directly
+          // No matches - proceed directly
+          console.log('➡️ No matches found, proceeding to next step');
           this.continue.emit({ ...this.form });
         }
       },
       error: (err) => {
         this.isLoadingMatches = false;
         console.error('Failed to find customer matches:', err);
+        this.matchedCustomer = null;
         // Proceed anyway on error
         this.continue.emit({ ...this.form });
       }

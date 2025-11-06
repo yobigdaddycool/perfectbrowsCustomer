@@ -4,6 +4,20 @@
     <p>Please provide your contact details so we can match your consent to your Perfect Brow profile.</p>
   </header>
 
+  @if (matchedCustomer) {
+    <div class="match-banner" role="status">
+      <div class="match-banner-title">Customer found</div>
+      <div class="match-banner-body">
+        <span class="match-banner-name">{{ matchedCustomer.first_name }} {{ matchedCustomer.last_name }}</span>
+        <span class="match-banner-detail">Phone: {{ matchedCustomer.phone }}</span>
+        @if (matchedCustomer.email) {
+          <span class="match-banner-detail">Email: {{ matchedCustomer.email }}</span>
+        }
+      </div>
+      <p class="match-banner-note">Review the info above, then press Continue to use this profile.</p>
+    </div>
+  }
+
   <div class="field-grid">
     <label class="field">
       <span>First Name <sup>*</sup></span>
