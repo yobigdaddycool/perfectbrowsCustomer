@@ -77,10 +77,15 @@ export class ConsentService {
       phone: phone
     }).pipe(
       map(response => {
+        console.log('🔍 Customer Match Response:', response);
+        if (response.debug) {
+          console.log('📋 Debug info:', response.debug);
+        }
         if (!response.success) {
           console.warn('Customer match search failed:', response.message);
           return [];
         }
+        console.log('✅ Found matches:', response.data?.matches);
         return response.data?.matches || [];
       })
     );

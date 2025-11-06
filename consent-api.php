@@ -139,7 +139,7 @@ function findCustomerMatches($pdo, $firstName, $lastName, $phone) {
         email,
         'exact' as match_type
     FROM customers
-    WHERE REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', '') = :phone
+    WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', ''), ' ', '') = :phone
     AND LOWER(TRIM(first_name)) = :firstName
     AND LOWER(TRIM(last_name)) = :lastName
     AND is_active = 1
@@ -167,7 +167,7 @@ function findCustomerMatches($pdo, $firstName, $lastName, $phone) {
         email,
         'suggested' as match_type
     FROM customers
-    WHERE REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', '') = :phone
+    WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', ''), ' ', '') = :phone
     AND (LOWER(TRIM(first_name)) != :firstName OR LOWER(TRIM(last_name)) != :lastName)
     AND is_active = 1
     ORDER BY created_at DESC
@@ -1052,6 +1052,14 @@ function findCustomerMatchesEndpoint(&$response) {
         }
 
         $response['debug'][] = "Finding matches for: $firstName $lastName, $phone";
+
+        // Show normalized values for debugging
+        $normalizedPhone = normalizePhone($phone);
+        $normalizedFirst = normalizeName($firstName);
+        $normalizedLast = normalizeName($lastName);
+        $response['debug'][] = "Normalized phone: $normalizedPhone";
+        $response['debug'][] = "Normalized first: $normalizedFirst";
+        $response['debug'][] = "Normalized last: $normalizedLast";
 
         // Use the helper function to find matches
         $matches = findCustomerMatches($pdo, $firstName, $lastName, $phone);
