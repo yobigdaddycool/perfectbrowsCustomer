@@ -80,6 +80,8 @@
       <button type="button" class="btn-primary" disabled>
         <span class="spinner-small"></span> Checking...
       </button>
+    } @else if (matchedCustomer) {
+      <button type="submit" class="btn-primary">Use This Profile &amp; Continue</button>
     } @else {
       <button type="submit" class="btn-primary">Continue</button>
     }

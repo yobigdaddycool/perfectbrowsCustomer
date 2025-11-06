@@ -51,7 +51,7 @@ export class ConsentIdentityComponent {
 
     // If user already selected a match or confirmed "proceed as new", emit immediately
     if (this.form.selectedCustomerId !== null || this.showMatchCards) {
-      this.matchedCustomer = null;
+      this.isLoadingMatches = false;
       this.continue.emit({ ...this.form });
       return;
     }
