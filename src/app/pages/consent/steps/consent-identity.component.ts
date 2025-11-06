@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ConsentService, CustomerMatch } from '../../../services/consent.service';
 
 export interface IdentityData {
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
+  selectedCustomerId?: number | null;
 }
 
 @Component({
@@ -17,6 +19,8 @@ export interface IdentityData {
   styleUrls: ['./consent-identity.component.css']
 })
 export class ConsentIdentityComponent {
+  private consentService = inject(ConsentService);
+
   @Input() initialData: IdentityData | null = null;
   @Output() continue = new EventEmitter<IdentityData>();
 
@@ -24,8 +28,14 @@ export class ConsentIdentityComponent {
     firstName: '',
     lastName: '',
     phone: '',
-    email: ''
+    email: '',
+    selectedCustomerId: null
   };
+
+  emailError = '';
+  customerMatches: CustomerMatch[] = [];
+  showMatchCards = false;
+  isLoadingMatches = false;
 
   ngOnInit() {
     if (this.initialData) {
@@ -34,6 +44,51 @@ export class ConsentIdentityComponent {
   }
 
   handleContinue() {
+    // If user already selected a match or confirmed "proceed as new", emit immediately
+    if (this.form.selectedCustomerId !== null || this.showMatchCards) {
+      this.continue.emit({ ...this.form });
+      return;
+    }
+
+    // Call API to find customer matches
+    this.isLoadingMatches = true;
+
+    this.consentService.findCustomerMatches(
+      this.form.firstName,
+      this.form.lastName,
+      this.form.phone
+    ).subscribe({
+      next: (matches) => {
+        this.isLoadingMatches = false;
+        this.customerMatches = matches;
+
+        // Filter to only suggested matches (not exact, since exact will auto-link later)
+        const suggestedMatches = matches.filter(m => m.match_type === 'suggested');
+
+        if (suggestedMatches.length > 0) {
+          // Show "Is this you?" cards
+          this.showMatchCards = true;
+        } else {
+          // No matches or only exact match - proceed directly
+          this.continue.emit({ ...this.form });
+        }
+      },
+      error: (err) => {
+        this.isLoadingMatches = false;
+        console.error('Failed to find customer matches:', err);
+        // Proceed anyway on error
+        this.continue.emit({ ...this.form });
+      }
+    });
+  }
+
+  selectMatch(customerId: number) {
+    this.form.selectedCustomerId = customerId;
+    this.continue.emit({ ...this.form });
+  }
+
+  proceedAsNew() {
+    this.form.selectedCustomerId = null;
     this.continue.emit({ ...this.form });
   }
 
@@ -63,5 +118,18 @@ export class ConsentIdentityComponent {
 
     // Force update the input field to prevent extra characters
     event.target.value = this.form.phone;
+  }
+
+  validateEmail() {
+    if (this.form.email && !this.isValidEmail(this.form.email)) {
+      this.emailError = 'Please enter a valid email address';
+    } else {
+      this.emailError = '';
+    }
+  }
+
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   }
 }

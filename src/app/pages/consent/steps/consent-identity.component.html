@@ -23,11 +23,51 @@
 
   <label class="field">
     <span>Email (optional)</span>
-    <input type="email" name="email" [(ngModel)]="form.email" placeholder="name@example.com" />
+    <input type="email" name="email" [(ngModel)]="form.email" placeholder="name@example.com" (blur)="validateEmail()" />
     <small class="hint">If provided, a verification code will be delivered here.</small>
+    @if (emailError) {
+      <small class="error">{{ emailError }}</small>
+    }
   </label>
 
+  <!-- Customer Match Cards -->
+  @if (showMatchCards && customerMatches.length > 0) {
+    <div class="match-section">
+      <h3 class="match-heading">Is this you?</h3>
+      <p class="match-subtitle">We found existing profile(s) with the same phone number. Please select your profile or create a new one.</p>
+
+      <div class="match-cards">
+        @for (match of customerMatches; track match.customer_id) {
+          <div class="match-card" (click)="selectMatch(match.customer_id)">
+            <div class="match-card-content">
+              <div class="match-name">{{ match.first_name }} {{ match.last_name }}</div>
+              <div class="match-details">
+                <div class="match-detail">📞 {{ match.phone }}</div>
+                @if (match.email) {
+                  <div class="match-detail">✉️ {{ match.email }}</div>
+                }
+              </div>
+            </div>
+            <div class="match-card-action">
+              <span class="match-select-btn">Select</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <button type="button" class="btn-secondary" (click)="proceedAsNew()">
+        None of these - Create New Profile
+      </button>
+    </div>
+  }
+
   <footer class="step-footer">
-    <button type="submit" class="btn-primary">Continue</button>
+    @if (isLoadingMatches) {
+      <button type="button" class="btn-primary" disabled>
+        <span class="spinner-small"></span> Checking...
+      </button>
+    } @else {
+      <button type="submit" class="btn-primary">Continue</button>
+    }
   </footer>
 </form>

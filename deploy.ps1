@@ -81,7 +81,7 @@ Copy-Item -Path dist\*\browser\* -Destination .deploy_publish -Recurse -Force
 # --- include extra files ---
 # 1) Copy backend API files from root directory
 Write-Host "Copying backend files..."
-$backendFiles = @("api.php", "db-config.php", "test-db-connection.php")
+$backendFiles = @("api.php", "db-config.php", "test-db-connection.php", "consent-api.php", "consent-config.php")
 foreach ($file in $backendFiles) {
   if (Test-Path $file) {
     Copy-Item -Path $file -Destination .deploy_publish -Force

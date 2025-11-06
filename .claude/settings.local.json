@@ -10,7 +10,10 @@
       "Bash(taskkill //F //PID 1857)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(ng serve:*)"
+      "Bash(ng serve:*)",
+      "Bash(timeout /t 10)",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t 3)"
     ],
     "deny": [],
     "ask": []
