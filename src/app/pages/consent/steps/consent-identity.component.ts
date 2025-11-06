@@ -49,9 +49,14 @@ export class ConsentIdentityComponent {
       return;
     }
 
+    if (this.matchedCustomer && this.form.selectedCustomerId !== null) {
+      this.confirmMatchedCustomer();
+      return;
+    }
+
     // If user already selected a match or confirmed "proceed as new", emit immediately
     if (this.form.selectedCustomerId !== null || this.showMatchCards) {
-      this.isLoadingMatches = false;
+      this.resetMatchState(false);
       this.continue.emit({ ...this.form });
       return;
     }
@@ -93,13 +98,14 @@ export class ConsentIdentityComponent {
         } else {
           // No matches - proceed directly
           console.log('➡️ No matches found, proceeding to next step');
+          this.resetMatchState(false);
           this.continue.emit({ ...this.form });
         }
       },
       error: (err) => {
         this.isLoadingMatches = false;
         console.error('Failed to find customer matches:', err);
-        this.matchedCustomer = null;
+        this.resetMatchState(true);
         // Proceed anyway on error
         this.continue.emit({ ...this.form });
       }
@@ -108,11 +114,13 @@ export class ConsentIdentityComponent {
 
   selectMatch(customerId: number) {
     this.form.selectedCustomerId = customerId;
+    this.resetMatchState(false);
     this.continue.emit({ ...this.form });
   }
 
   proceedAsNew() {
     this.form.selectedCustomerId = null;
+    this.resetMatchState(false);
     this.continue.emit({ ...this.form });
   }
 
@@ -149,6 +157,26 @@ export class ConsentIdentityComponent {
       this.emailError = 'Please enter a valid email address';
     } else {
       this.emailError = '';
+    }
+  }
+
+  confirmMatchedCustomer() {
+    if (!this.matchedCustomer || this.form.selectedCustomerId === null) {
+      return;
+    }
+
+    this.resetMatchState(false);
+    this.continue.emit({ ...this.form });
+  }
+
+  private resetMatchState(clearSelectedId: boolean) {
+    this.isLoadingMatches = false;
+    this.showMatchCards = false;
+    this.customerMatches = [];
+    this.matchedCustomer = null;
+
+    if (clearSelectedId) {
+      this.form.selectedCustomerId = null;
     }
   }
 
